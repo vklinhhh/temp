@@ -15,7 +15,11 @@ import json
 import logging
 import inspect # For checking kwargs in from_pretrained fallback
 import math
-
+from .diacritic_attention import (
+    VisualDiacriticAttention,
+    CharacterDiacriticCompatibility,
+    FewShotDiacriticAdapter
+)
 logger = logging.getLogger(__name__)
 
 # --- Configuration Class (Updated for Transformer Encoder) ---
@@ -123,16 +127,6 @@ class LearnedPositionalEncoding1D(nn.Module):
         x = x + self.pos_embedding(positions) # pos_embedding(positions) will be [1, seq_len, d_model]
         return self.dropout(x)
 
-# Placeholder for potential advanced diacritic components (from your existing code)
-class VisualDiacriticAttention(nn.Module): # Placeholder
-    def __init__(self, feature_dim, diacritic_vocab_size): super().__init__(); self.fc = nn.Linear(feature_dim, diacritic_vocab_size)
-    def forward(self, x): return self.fc(x)
-class CharacterDiacriticCompatibility(nn.Module): # Placeholder
-    def __init__(self, base_vocab_size, diacritic_vocab_size, shared_dim, base_char_vocab, diacritic_vocab): super().__init__(); self.fc = nn.Linear(base_vocab_size, diacritic_vocab_size) # Dummy
-    def forward(self, base_logits, shared_features): return self.fc(base_logits) # Dummy
-class FewShotDiacriticAdapter(nn.Module): # Placeholder
-    def __init__(self, feature_dim, diacritic_vocab_size, num_prototypes): super().__init__(); self.fc = nn.Linear(feature_dim, diacritic_vocab_size)
-    def forward(self, x): return self.fc(x)
 
 
 # --- Model Class (Hierarchical + Multi-Scale + Transformer Encoder) ---
