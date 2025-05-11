@@ -440,12 +440,47 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         except Exception as e: logger.error(f"Failed to save processor: {e}")
         logger.info(f"Model components saved.")
 
+    # @classmethod
+    # def from_pretrained(cls, pretrained_model_name_or_path, config=None, **kwargs):
+    #     logger.info(f"Loading {cls.__name__} from: {pretrained_model_name_or_path}")
+    #     config_path = os.path.join(pretrained_model_name_or_path, "config.json"); loaded_config = None
+    #     if config is not None and isinstance(config, cls.config_class): loaded_config = config; logger.info("Using provided config.")
+    #     elif os.path.exists(config_path): loaded_config = cls.config_class.from_pretrained(pretrained_model_name_or_path, **kwargs); logger.info(f"Loading config from: {config_path}")
+    #     else:
+    #         logger.warning(f"Config not found at {config_path}. Initializing new from kwargs.")
+    #         if not all(k in kwargs for k in ['base_char_vocab', 'diacritic_vocab', 'combined_char_vocab']): raise ValueError("All vocabs required in kwargs w/o config.json.")
+    #         if 'vision_encoder_name' not in kwargs: kwargs['vision_encoder_name'] = cls.config_class().vision_encoder_name
+    #         loaded_config = cls.config_class(**kwargs)
+    #     if 'base_char_vocab' in kwargs and kwargs['base_char_vocab']: loaded_config.base_char_vocab = kwargs['base_char_vocab']; loaded_config.base_char_vocab_size = len(kwargs['base_char_vocab'])
+    #     if 'diacritic_vocab' in kwargs and kwargs['diacritic_vocab']: loaded_config.diacritic_vocab = kwargs['diacritic_vocab']; loaded_config.diacritic_vocab_size = len(kwargs['diacritic_vocab'])
+    #     if 'combined_char_vocab' in kwargs and kwargs['combined_char_vocab']: loaded_config.combined_char_vocab = kwargs['combined_char_vocab']; loaded_config.combined_char_vocab_size = len(kwargs['combined_char_vocab'])
+    #     model = cls(loaded_config)
+    #     state_dict_path = os.path.join(pretrained_model_name_or_path, "pytorch_model.bin"); is_loading_base_model = not os.path.exists(config_path)
+    #     if os.path.exists(state_dict_path) and not is_loading_base_model:
+    #         logger.info(f"Loading state dict from: {state_dict_path}")
+    #         try: state_dict = torch.load(state_dict_path, map_location="cpu"); load_result = model.load_state_dict(state_dict, strict=False); logger.info(f"Loaded state. Miss:{load_result.missing_keys}, Unexp:{load_result.unexpected_keys}")
+    #         except Exception as e: logger.error(f"Error loading state dict: {e}")
+    #     elif is_loading_base_model: logger.info(f"Loading base weights only.")
+    #     else: logger.warning(f"State dict not found. Using base + random.")
+    #     model.base_char_vocab = loaded_config.base_char_vocab; model.diacritic_vocab = loaded_config.diacritic_vocab; model.combined_char_vocab = loaded_config.combined_char_vocab
+    #     return model
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, config=None, **kwargs):
         logger.info(f"Loading {cls.__name__} from: {pretrained_model_name_or_path}")
         config_path = os.path.join(pretrained_model_name_or_path, "config.json"); loaded_config = None
         if config is not None and isinstance(config, cls.config_class): loaded_config = config; logger.info("Using provided config.")
-        elif os.path.exists(config_path): loaded_config = cls.config_class.from_pretrained(pretrained_model_name_or_path, **kwargs); logger.info(f"Loading config from: {config_path}")
+        elif os.path.exists(config_path): 
+            loaded_config = cls.config_class.from_pretrained(pretrained_model_name_or_path, **kwargs)
+            logger.info(f"Loading config from: {config_path}")
+            
+            # Fix for vision_encoder_config if it's a dict
+            if hasattr(loaded_config, 'vision_encoder_config') and isinstance(loaded_config.vision_encoder_config, dict):
+                from transformers import PretrainedConfig
+                vision_config = PretrainedConfig()
+                for key, value in loaded_config.vision_encoder_config.items():
+                    setattr(vision_config, key, value)
+                loaded_config.vision_encoder_config = vision_config
+                logger.info("Converted vision_encoder_config from dict to object")
         else:
             logger.warning(f"Config not found at {config_path}. Initializing new from kwargs.")
             if not all(k in kwargs for k in ['base_char_vocab', 'diacritic_vocab', 'combined_char_vocab']): raise ValueError("All vocabs required in kwargs w/o config.json.")

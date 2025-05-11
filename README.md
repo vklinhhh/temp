@@ -56,3 +56,9 @@ This architecture attempts to leverage the linguistic structure (Diacritic depen
 │   └── main_training_hierarchical.log
 ├── README_hierarchical.md      # This file
 └── requirements_hierarchical.txt # Dependencies
+
+
+
+```bash
+python -m scripts.train_hierarchical_ctc   --dataset_name vklinhhh/vnhwt_opt_1    --output_dir outputs/dynamic_fusion_large  --use_dynamic_fusion   --use_feature_enhancer   --transformer_d_model 768   --transformer_nhead 12   --num_transformer_layers 6   --shared_hidden_size 768   --batch_size 16   --learning_rate 5e-5   --discriminative_lr   --encoder_lr_factor 0.1   --warmup_ratio 0.05   --weight_decay 0.02   --epochs 25   --use_visual_diacritic_attention   --use_character_diacritic_compatibility   --use_few_shot_diacritic_adapter   --num_few_shot_prototypes 10   --use_amp   --fusion_method concat_proj
+
