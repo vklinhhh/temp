@@ -16,7 +16,7 @@ import seaborn as sns
 from collections import defaultdict
 
 # --- Imports from project ---
-# <<< CHANGE: Import the multi-scale hierarchical model >>>
+# Import the multi-scale hierarchical model
 from model.hierarchical_ctc_model import HierarchicalCtcMultiScaleOcrModel
 from data.ctc_ocr_dataset import CtcOcrDataset
 from data.ctc_collation import ctc_collate_fn
@@ -35,12 +35,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger('EvaluateHierarchicalCtcScript')
 
 
-# --- New: Helper Functions for Diacritic Analysis ---
+# --- Helper Functions for Diacritic Analysis (remain the same) ---
 def extract_diacritics(text):
     """
     Extract diacritics from text for analysis.
     Returns a dictionary mapping character position to diacritic type.
     """
+    # ... (function implementation remains the same) ...
+    
     diacritics_map = {}
     
     # Define dictionaries mapping characters to their base and diacritic components
@@ -147,6 +149,7 @@ def analyze_diacritic_accuracy(ground_truths, predictions):
     """
     Analyze diacritic prediction accuracy in detail.
     """
+    # ... (function implementation remains the same) ...
     diacritic_stats = defaultdict(lambda: {'correct': 0, 'total': 0, 'examples': []})
     
     # Process each pair of ground truth and prediction
@@ -197,6 +200,7 @@ def visualize_diacritic_accuracy(diacritic_results, output_dir):
     """
     Create visualizations for diacritic prediction accuracy.
     """
+    # ... (function implementation remains the same) ...
     os.makedirs(output_dir, exist_ok=True)
     
     # Extract data for plotting
@@ -247,11 +251,11 @@ def visualize_diacritic_accuracy(diacritic_results, output_dir):
     return os.path.join(output_dir, 'diacritic_accuracy.png')
 
 
-def run_hierarchical_evaluation( # Renamed function
+def run_hierarchical_evaluation(
     model_path,
     dataset_name,
     output_dir,
-    combined_char_vocab_path, # Requires combined vocab
+    combined_char_vocab_path,
     dataset_split='test',
     batch_size=16,
     num_workers=4,
@@ -264,7 +268,6 @@ def run_hierarchical_evaluation( # Renamed function
     os.makedirs(output_dir, exist_ok=True)
 
     # --- Load Combined Vocabulary FIRST ---
-    # ... (vocab loading remains the same) ...
     try:
         logger.info(f"Loading combined char vocab from: {combined_char_vocab_path}")
         with open(combined_char_vocab_path, 'r', encoding='utf-8') as f: combined_char_vocab = json.load(f)
@@ -279,7 +282,6 @@ def run_hierarchical_evaluation( # Renamed function
     # --- Load Model and Processor ---
     try:
         logger.info(f"Loading trained Hierarchical CTC model from: {model_path}")
-        # <<< CHANGE: Use the correct model class name >>>
         model = HierarchicalCtcMultiScaleOcrModel.from_pretrained(
             model_path,
             combined_char_vocab=combined_char_vocab # Pass vocab in case config is missing/minimal
@@ -298,11 +300,16 @@ def run_hierarchical_evaluation( # Renamed function
         if hasattr(model.config, 'use_few_shot_diacritic_adapter') and model.config.use_few_shot_diacritic_adapter:
             logger.info(f"Model uses Few-Shot Diacritic Adapter with {model.config.num_few_shot_prototypes} prototypes")
         
+        # NEW: Log dynamic fusion information
+        if hasattr(model.config, 'use_dynamic_fusion') and model.config.use_dynamic_fusion:
+            logger.info("Model uses Dynamic Multi-Scale Fusion")
+        if hasattr(model.config, 'use_feature_enhancer') and model.config.use_feature_enhancer:
+            logger.info("Model uses Local Feature Enhancer")
+        
     except Exception as e:
         logger.error(f"FATAL: Failed to load model: {e}", exc_info=True); return
 
     # --- Load Test Dataset ---
-    # ... (dataset loading logic remains the same) ...
     try:
         logger.info(f"Loading test dataset: {dataset_name}, split: {dataset_split}")
         hf_dataset = load_dataset(dataset_name)
@@ -319,7 +326,6 @@ def run_hierarchical_evaluation( # Renamed function
 
 
     # --- Create Dataset and DataLoader ---
-    # ... (dataset creation remains the same, uses combined map) ...
     try:
         logger.info("Creating CTC test dataset wrapper (using combined vocab)...")
         test_dataset = CtcOcrDataset(test_hf_split, processor, combined_char_to_idx, unk_token='[UNK]')
@@ -338,7 +344,6 @@ def run_hierarchical_evaluation( # Renamed function
     ctc_loss_fn_eval = nn.CTCLoss(blank=blank_idx, reduction='sum', zero_infinity=True)
 
     # --- Run Inference Loop ---
-    # ... (Inference loop remains the same - uses model.forward(), gets final 'logits') ...
     logger.info("Starting evaluation loop...")
     with torch.no_grad():
         progress_bar = tqdm(test_loader, desc="Evaluating Test Set")
@@ -378,7 +383,6 @@ def run_hierarchical_evaluation( # Renamed function
     logger.info("Evaluation loop finished.")
 
     # --- Process Results (Uses standard CTC metrics) ---
-    # ... (Result processing and reporting remain the same) ...
     if not all_ground_truths: logger.error("No samples processed."); return
     df_results = pd.DataFrame({'GroundTruth': all_ground_truths, 'Prediction': all_predictions})
     results_csv_path = os.path.join(output_dir, "evaluation_results_raw.csv")
@@ -389,7 +393,7 @@ def run_hierarchical_evaluation( # Renamed function
     cer, wer = calculate_corpus_metrics(df_results['Prediction'].tolist(), df_results['GroundTruth'].tolist())
     logger.info(f"Final Evaluation Metrics:"); logger.info(f"  Average Loss: {avg_loss:.4f}"); logger.info(f"  CER         : {cer:.4f}"); logger.info(f"  WER         : {wer:.4f}")
     
-    # --- NEW: Analyze Diacritic Accuracy ---
+    # --- Analyze Diacritic Accuracy ---
     logger.info("Analyzing diacritic recognition accuracy...")
     diacritic_results = analyze_diacritic_accuracy(df_results['GroundTruth'].tolist(), df_results['Prediction'].tolist())
     
@@ -417,6 +421,12 @@ def run_hierarchical_evaluation( # Renamed function
     diacritic_avg_accuracy = np.mean([stats['accuracy'] for stats in diacritic_results.values()])
     summary_stats['diacritic_avg_accuracy'] = diacritic_avg_accuracy
     
+    # Add dynamic fusion info to summary stats
+    if hasattr(model.config, 'use_dynamic_fusion'):
+        summary_stats['use_dynamic_fusion'] = model.config.use_dynamic_fusion
+    if hasattr(model.config, 'use_feature_enhancer'):
+        summary_stats['use_feature_enhancer'] = model.config.use_feature_enhancer
+    
     # Standard visualization generation
     standard_viz_dir = generate_visualizations(df_results, output_dir)
     
@@ -433,6 +443,7 @@ def run_hierarchical_evaluation( # Renamed function
 
 def create_diacritic_html_report(report_path, diacritic_results, model_path, viz_path):
     """Create an HTML report specifically for diacritic analysis."""
+    # ... (function implementation remains the same) ...
     logger.info(f"Generating diacritic HTML report at: {report_path}")
     
     # Calculate overall diacritic accuracy
@@ -600,6 +611,8 @@ def create_diacritic_html_report(report_path, diacritic_results, model_path, viz
                 <li>Adding more training samples with combined diacritics</li>
                 <li>Using the Few-Shot Diacritic Adapter for rare combinations</li>
                 <li>Fine-tuning the Visual Diacritic Attention mechanism</li>
+                <li>Enabling Dynamic Fusion to better capture multi-scale features</li>
+                <li>Enabling Feature Enhancer for better local feature detection</li>
             </ul>
             </li>
             """
@@ -612,6 +625,7 @@ def create_diacritic_html_report(report_path, diacritic_results, model_path, viz
         <br>Recommendation: Consider fundamental changes to the diacritic classifier, such as:
         <ul>
             <li>Enable all three diacritic enhancement modules</li>
+            <li>Enable Dynamic Multi-Scale Fusion and Feature Enhancer</li>
             <li>Increase training data with diverse diacritical marks</li>
             <li>Consider a specialized training phase focusing only on diacritics</li>
         </ul>
@@ -625,6 +639,7 @@ def create_diacritic_html_report(report_path, diacritic_results, model_path, viz
             <li>Enable Visual Diacritic Attention to better focus on diacritic regions</li>
             <li>Add more examples of the lower-performing diacritics to the training set</li>
             <li>Use Character-Diacritic Compatibility to improve linguistic consistency</li>
+            <li>Consider enabling Dynamic Fusion for better multi-scale feature extraction</li>
         </ul>
         </li>
         """
@@ -664,11 +679,11 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=4)
     args = parser.parse_args()
 
-    run_hierarchical_evaluation( # Call the evaluation function
+    run_hierarchical_evaluation(
         model_path=args.model_path,
         dataset_name=args.dataset_name,
         output_dir=args.output_dir,
-        combined_char_vocab_path=args.combined_char_vocab_path, # Pass combined vocab path
+        combined_char_vocab_path=args.combined_char_vocab_path,
         dataset_split=args.dataset_split,
         batch_size=args.batch_size,
         num_workers=args.num_workers

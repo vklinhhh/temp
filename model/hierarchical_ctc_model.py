@@ -20,9 +20,14 @@ from .diacritic_attention import (
     CharacterDiacriticCompatibility,
     FewShotDiacriticAdapter
 )
+# --- NEW: Import Dynamic Fusion modules ---
+from .dynamic_fusion import (
+    DynamicMultiScaleFusion,
+    LocalFeatureEnhancer
+)
 logger = logging.getLogger(__name__)
 
-# --- Configuration Class (Updated for Transformer Encoder) ---
+# --- Configuration Class (Updated for Transformer Encoder and Dynamic Fusion) ---
 class HierarchicalCtcOcrConfig(PretrainedConfig):
     model_type = "hierarchical_ctc_transformer" # Reflects Transformer change
 
@@ -35,6 +40,9 @@ class HierarchicalCtcOcrConfig(PretrainedConfig):
         # Vision Feature Fusion
         vision_encoder_layer_indices=[-1, -4],
         feature_fusion_method="concat_proj",
+        # --- NEW: Dynamic Fusion options ---
+        use_dynamic_fusion=False,
+        use_feature_enhancer=False,
         # --- REMOVED RNN Params ---
         # --- NEW: Transformer Encoder Params ---
         num_transformer_encoder_layers=4,
@@ -69,6 +77,10 @@ class HierarchicalCtcOcrConfig(PretrainedConfig):
 
         self.vision_encoder_layer_indices = sorted(list(set(vision_encoder_layer_indices)))
         self.feature_fusion_method = feature_fusion_method
+        
+        # --- NEW: Dynamic Fusion options ---
+        self.use_dynamic_fusion = use_dynamic_fusion
+        self.use_feature_enhancer = use_feature_enhancer
 
         self.num_transformer_encoder_layers = num_transformer_encoder_layers
         self.transformer_d_model = transformer_d_model
@@ -94,7 +106,7 @@ class HierarchicalCtcOcrConfig(PretrainedConfig):
         if not self.combined_char_vocab:
             logger.warning("Combined character vocabulary is empty during config init.")
 
-# --- Positional Encoding Classes (Copied from previous suggestion) ---
+# --- Positional Encoding Classes (Remain the same) ---
 class SinusoidalPositionalEncoding1D(nn.Module):
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super().__init__()
@@ -129,7 +141,7 @@ class LearnedPositionalEncoding1D(nn.Module):
 
 
 
-# --- Model Class (Hierarchical + Multi-Scale + Transformer Encoder) ---
+# --- Model Class (Hierarchical + Multi-Scale + Transformer Encoder + Dynamic Fusion) ---
 class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
     config_class = HierarchicalCtcOcrConfig
 
@@ -157,26 +169,49 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         num_fusion_layers = len(config.vision_encoder_layer_indices)
         fusion_input_size_raw = encoder_hidden_size * num_fusion_layers
         self.fusion_projection = None; self.pre_fusion_projections = None; self.fusion_bilinear = None
+        
+        # --- NEW: Dynamic Fusion Module ---
+        self.dynamic_fusion = None
+        if config.use_dynamic_fusion and num_fusion_layers > 1:
+            logger.info(f"Using Dynamic Multi-Scale Fusion with {num_fusion_layers} layers")
+            self.dynamic_fusion = DynamicMultiScaleFusion(
+                encoder_output_size=encoder_hidden_size,
+                num_layers=num_fusion_layers,
+                fusion_dim=config.transformer_d_model,
+                use_gate=True
+            )
+        
+        # --- NEW: Local Feature Enhancer ---
+        self.feature_enhancer = None
+        if config.use_feature_enhancer:
+            logger.info("Using Local Feature Enhancer for diacritical marks")
+            self.feature_enhancer = LocalFeatureEnhancer(
+                feature_dim=config.transformer_d_model,
+                num_diacritics=config.diacritic_vocab_size if hasattr(config, 'diacritic_vocab_size') else None,
+                use_spatial_attention=True
+            )
 
         # Determine input size for positional encoding / transformer
         sequence_model_input_size = config.transformer_d_model
 
-        if config.feature_fusion_method == "concat_proj" and num_fusion_layers > 1:
-            self.fusion_projection = nn.Linear(fusion_input_size_raw, config.transformer_d_model)
-            logger.info(f"Using 'concat_proj' fusion (Raw In: {fusion_input_size_raw}, Projected Out: {config.transformer_d_model})")
-        elif config.feature_fusion_method == "add" and num_fusion_layers > 1:
-            if encoder_hidden_size != config.transformer_d_model:
-                self.pre_fusion_projections = nn.ModuleList([nn.Linear(encoder_hidden_size, config.transformer_d_model) for _ in range(num_fusion_layers)])
-            logger.info("Using 'add' feature fusion (Out: {config.transformer_d_model})")
-        elif config.feature_fusion_method == "bilinear" and num_fusion_layers == 2:
-             self.fusion_bilinear = nn.Bilinear(encoder_hidden_size, encoder_hidden_size, config.transformer_d_model)
-             logger.info("Using 'bilinear' feature fusion (Out: {config.transformer_d_model})")
-        else: # 'none' or single layer from fusion_indices
-            if config.feature_fusion_method != 'none' and num_fusion_layers > 1: logger.warning(f"Fusion method '{config.feature_fusion_method}' not fully handled or invalid. Using last selected layer.")
-            if encoder_hidden_size != config.transformer_d_model:
-                 self.fusion_projection = nn.Linear(encoder_hidden_size, config.transformer_d_model)
-                 logger.info(f"Projecting last selected encoder layer to transformer_d_model: {config.transformer_d_model}")
-            # If no projection needed, sequence_model_input_size is encoder_hidden_size, which must match transformer_d_model
+        # Only use standard fusion methods if dynamic fusion is disabled
+        if not config.use_dynamic_fusion:
+            if config.feature_fusion_method == "concat_proj" and num_fusion_layers > 1:
+                self.fusion_projection = nn.Linear(fusion_input_size_raw, config.transformer_d_model)
+                logger.info(f"Using 'concat_proj' fusion (Raw In: {fusion_input_size_raw}, Projected Out: {config.transformer_d_model})")
+            elif config.feature_fusion_method == "add" and num_fusion_layers > 1:
+                if encoder_hidden_size != config.transformer_d_model:
+                    self.pre_fusion_projections = nn.ModuleList([nn.Linear(encoder_hidden_size, config.transformer_d_model) for _ in range(num_fusion_layers)])
+                logger.info("Using 'add' feature fusion (Out: {config.transformer_d_model})")
+            elif config.feature_fusion_method == "bilinear" and num_fusion_layers == 2:
+                 self.fusion_bilinear = nn.Bilinear(encoder_hidden_size, encoder_hidden_size, config.transformer_d_model)
+                 logger.info("Using 'bilinear' feature fusion (Out: {config.transformer_d_model})")
+            else: # 'none' or single layer from fusion_indices
+                if config.feature_fusion_method != 'none' and num_fusion_layers > 1: logger.warning(f"Fusion method '{config.feature_fusion_method}' not fully handled or invalid. Using last selected layer.")
+                if encoder_hidden_size != config.transformer_d_model:
+                     self.fusion_projection = nn.Linear(encoder_hidden_size, config.transformer_d_model)
+                     logger.info(f"Projecting last selected encoder layer to transformer_d_model: {config.transformer_d_model}")
+                # If no projection needed, sequence_model_input_size is encoder_hidden_size, which must match transformer_d_model
 
         # --- Positional Encoding ---
         if config.positional_encoding_type == "sinusoidal_1d":
@@ -275,7 +310,7 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
              for layer in self.diacritic_condition_proj:
                   if isinstance(layer, nn.Linear): nn.init.xavier_uniform_(layer.weight); nn.init.zeros_(layer.bias)
         # Init new diacritic enhancement modules if they are actual nn.Module subclasses
-        for mod_name in ['visual_diacritic_attention', 'character_diacritic_compatibility', 'few_shot_diacritic_adapter']:
+        for mod_name in ['visual_diacritic_attention', 'character_diacritic_compatibility', 'few_shot_diacritic_adapter', 'dynamic_fusion', 'feature_enhancer']:
             module = getattr(self, mod_name, None)
             if module and isinstance(module, nn.Module):
                  for name, param in module.named_parameters():
@@ -296,29 +331,42 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         else: features_to_fuse = [all_hidden_states[i] for i in valid_indices]
 
         fused_features = None
-        if self.config.feature_fusion_method == "concat_proj" and len(features_to_fuse) > 1 and self.fusion_projection:
-            concatenated_features = torch.cat(features_to_fuse, dim=-1)
-            fused_features = self.fusion_projection(concatenated_features)
-        elif self.config.feature_fusion_method == "add" and len(features_to_fuse) > 1:
-            if hasattr(self, 'pre_fusion_projections') and self.pre_fusion_projections:
-                projected_features = [self.pre_fusion_projections[i](feat) for i, feat in enumerate(features_to_fuse)]
-                fused_features = torch.stack(projected_features, dim=0).mean(dim=0)
-            else: fused_features = torch.stack(features_to_fuse, dim=0).mean(dim=0)
-        elif self.config.feature_fusion_method == "bilinear" and len(features_to_fuse) == 2 and self.fusion_bilinear:
-             fused_features = self.fusion_bilinear(features_to_fuse[0], features_to_fuse[1])
-        else: # 'none' or fallback
-            last_layer_features = features_to_fuse[-1]
-            if self.fusion_projection and self.config.feature_fusion_method != "concat_proj": # Project if only last layer AND mismatch
-                 fused_features = self.fusion_projection(last_layer_features)
-            elif self.config.feature_fusion_method == "concat_proj" and len(features_to_fuse)==1 and self.fusion_projection: # single layer selected but proj exists
-                 fused_features = self.fusion_projection(last_layer_features) # This case means last_layer_features should match proj input
-            else: fused_features = last_layer_features
+        
+        # --- NEW: Use Dynamic Fusion if enabled ---
+        if self.dynamic_fusion is not None:
+            # Pass features list directly to dynamic fusion
+            fused_features = self.dynamic_fusion(features_to_fuse)
+            logger.debug(f"Applied dynamic fusion to {len(features_to_fuse)} features")
+        else:
+            # Standard fusion methods
+            if self.config.feature_fusion_method == "concat_proj" and len(features_to_fuse) > 1 and self.fusion_projection:
+                concatenated_features = torch.cat(features_to_fuse, dim=-1)
+                fused_features = self.fusion_projection(concatenated_features)
+            elif self.config.feature_fusion_method == "add" and len(features_to_fuse) > 1:
+                if hasattr(self, 'pre_fusion_projections') and self.pre_fusion_projections:
+                    projected_features = [self.pre_fusion_projections[i](feat) for i, feat in enumerate(features_to_fuse)]
+                    fused_features = torch.stack(projected_features, dim=0).mean(dim=0)
+                else: fused_features = torch.stack(features_to_fuse, dim=0).mean(dim=0)
+            elif self.config.feature_fusion_method == "bilinear" and len(features_to_fuse) == 2 and self.fusion_bilinear:
+                 fused_features = self.fusion_bilinear(features_to_fuse[0], features_to_fuse[1])
+            else: # 'none' or fallback
+                last_layer_features = features_to_fuse[-1]
+                if self.fusion_projection and self.config.feature_fusion_method != "concat_proj": # Project if only last layer AND mismatch
+                     fused_features = self.fusion_projection(last_layer_features)
+                elif self.config.feature_fusion_method == "concat_proj" and len(features_to_fuse)==1 and self.fusion_projection: # single layer selected but proj exists
+                     fused_features = self.fusion_projection(last_layer_features) # This case means last_layer_features should match proj input
+                else: fused_features = last_layer_features
 
         if fused_features is None: # Safety fallback
             logger.error("Fused features are None! Using last vision encoder layer directly.")
             fused_features = all_hidden_states[-1]
             # If dimensions still don't match transformer_d_model, it will error.
             # Ensure transformer_d_model is set to encoder_hidden_size if no fusion/projection.
+        
+        # --- NEW: Apply Local Feature Enhancer if enabled ---
+        if self.feature_enhancer is not None:
+            fused_features = self.feature_enhancer(fused_features)
+            logger.debug("Applied local feature enhancer")
 
         # 3. Positional Encoding
         features_with_pos = self.pos_encoder(fused_features)
@@ -374,7 +422,7 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
             'base_logits': base_logits, 'diacritic_logits': diacritic_logits,
         }
 
-    # --- save_pretrained and from_pretrained methods (same as HierarchicalCtcV2OcrModel) ---
+    # --- save_pretrained and from_pretrained methods (same as before) ---
     def save_pretrained(self, save_directory, **kwargs):
         logger.info(f"Saving {self.__class__.__name__} model to: {save_directory}")
         os.makedirs(save_directory, exist_ok=True)
@@ -416,3 +464,17 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         else: logger.warning(f"State dict not found. Using base + random.")
         model.base_char_vocab = loaded_config.base_char_vocab; model.diacritic_vocab = loaded_config.diacritic_vocab; model.combined_char_vocab = loaded_config.combined_char_vocab
         return model
+
+# --- Create a combined class that supports both Transformer and Multi-Scale ---
+class HierarchicalCtcMultiScaleOcrModel(HierarchicalCtcTransformerOcrModel):
+    """
+    A combined model that supports both Transformer architecture and
+    optional Multi-Scale fusion via the DynamicMultiScaleFusion module.
+    
+    This model extends the transformer-based model and adds optional
+    dynamic fusion capabilities for improved feature extraction.
+    """
+    def __init__(self, config: HierarchicalCtcOcrConfig):
+        # Just call the parent constructor which now supports dynamic fusion
+        super().__init__(config)
+        logger.info(f"Initialized {self.__class__.__name__} with multi-scale fusion capabilities")

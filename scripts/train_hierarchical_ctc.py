@@ -12,7 +12,7 @@ import numpy as np
 
 # --- Adjust imports ---
 from model.hierarchical_ctc_model import (
-    HierarchicalCtcTransformerOcrModel, # <<< USE THE NEW TRANSFORMER MODEL
+    HierarchicalCtcMultiScaleOcrModel, # Use the combined model that supports both transformer and dynamic fusion
     HierarchicalCtcOcrConfig,
 )
 from data.ctc_ocr_dataset import CtcOcrDataset  # Reuses standard CTC dataset
@@ -29,10 +29,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('main_training_hier_transformer.log'), # Updated log file name
+        logging.FileHandler('main_training_hier_multiscale.log'), # Updated log file name
     ],
 )
-logger = logging.getLogger('TrainHierarchicalTransformerCtcScript') # Updated logger name
+logger = logging.getLogger('TrainHierarchicalMultiScaleScript') # Updated logger name
 
 # --- Define Base/Diacritic Vocabs (Needed for model config) ---
 BASE_CHAR_VOCAB_HIER = [
@@ -52,12 +52,12 @@ DIACRITIC_VOCAB_HIER = [
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train Hierarchical Transformer CTC Vietnamese OCR model')
+    parser = argparse.ArgumentParser(description='Train Hierarchical Multi-Scale CTC Vietnamese OCR model')
 
     # --- Arguments ---
     parser.add_argument('--dataset_name', type=str, default='vklinhhh/vietnamese_character_diacritic_cwl_v2', help='HF dataset (image, label, base_character, diacritic_type)')
     parser.add_argument('--vision_encoder', type=str, default='microsoft/trocr-base-handwritten', help='Vision encoder')
-    parser.add_argument('--output_dir', type=str, default='outputs/hier_ctc_transformer_model', help='Output directory')
+    parser.add_argument('--output_dir', type=str, default='outputs/hier_ctc_multiscale_model', help='Output directory')
     parser.add_argument('--combined_char_vocab_json', type=str, default=None, help='Path to JSON list of FINAL combined characters. If None, uses default generator.')
     parser.add_argument('--resume_from_checkpoint', type=str, default=None)
     parser.add_argument('--load_weights_from', type=str, default=None, help="Load pre-trained vision encoder, other layers random.")
@@ -65,6 +65,10 @@ def main():
     # Multi-Scale Fusion Arguments
     parser.add_argument('--fusion_layers', type=str, default="-1,-4", help='Comma-separated vision encoder layer indices to fuse (e.g., "-1,-4").')
     parser.add_argument('--fusion_method', type=str, default="concat_proj", choices=['concat_proj', 'add', 'bilinear', 'none'], help='Method to fuse features.')
+    
+    # --- NEW: Dynamic Fusion options ---
+    parser.add_argument('--use_dynamic_fusion', action='store_true', help='Use Dynamic Multi-Scale Fusion instead of static fusion method.')
+    parser.add_argument('--use_feature_enhancer', action='store_true', help='Use Local Feature Enhancer for diacritical marks.')
 
     # --- Transformer Encoder Arguments ---
     parser.add_argument('--num_transformer_layers', type=int, default=4, help="Number of Transformer encoder layers after vision fusion.")
@@ -101,7 +105,7 @@ def main():
     # Logging, System params
     parser.add_argument('--wandb_project', type=str, default=None)
     parser.add_argument('--wandb_run_name', type=str, default=None)
-    parser.add_argument('--log_interval', type=int, default=50)
+    parser.add_argument('--log_interval', type=int, default=5000)
     parser.add_argument('--eval_steps', type=int, default=None)
     parser.add_argument('--use_amp', action='store_true')
     parser.add_argument('--num_workers', type=int, default=4) # Default from your previous script
@@ -121,7 +125,7 @@ def main():
     torch.manual_seed(args.seed); np.random.seed(args.seed)
     if torch.cuda.is_available(): torch.cuda.manual_seed_all(args.seed)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'); logger.info(f"Device: {device}")
-    run_name_to_use = args.wandb_run_name or os.path.basename(args.output_dir) or "hier_ctc_transformer_run"
+    run_name_to_use = args.wandb_run_name or os.path.basename(args.output_dir) or "hier_ctc_multiscale_run"
     try: fusion_layer_indices = [int(x.strip()) for x in args.fusion_layers.split(',')]
     except: logger.error(f"Invalid --fusion_layers. Using default [-1,-4]."); fusion_layer_indices = [-1,-4]
 
@@ -181,7 +185,7 @@ def main():
 
     # --- Initialize Model ---
     try:
-        logger.info("Initializing HierarchicalCtcTransformerOcrModel configuration...")
+        logger.info("Initializing HierarchicalCtcMultiScaleOcrModel configuration...")
         model_config = HierarchicalCtcOcrConfig(
             vision_encoder_name=args.vision_encoder,
             base_char_vocab=BASE_CHAR_VOCAB_HIER,
@@ -189,7 +193,10 @@ def main():
             combined_char_vocab=combined_vocab,
             vision_encoder_layer_indices=fusion_layer_indices,
             feature_fusion_method=args.fusion_method,
-            # --- Pass Transformer Params ---
+            # --- NEW: Dynamic Fusion params ---
+            use_dynamic_fusion=args.use_dynamic_fusion,
+            use_feature_enhancer=args.use_feature_enhancer,
+            # --- Transformer Params ---
             num_transformer_encoder_layers=args.num_transformer_layers,
             transformer_d_model=args.transformer_d_model,
             transformer_nhead=args.transformer_nhead,
@@ -212,9 +219,18 @@ def main():
         model_load_path = args.load_weights_from if args.load_weights_from else args.vision_encoder
         logger.info(f"Instantiating/Loading model from: {model_load_path}")
         init_kwargs = model_config.to_dict()
-        model = HierarchicalCtcTransformerOcrModel.from_pretrained(model_load_path, **init_kwargs)
+        model = HierarchicalCtcMultiScaleOcrModel.from_pretrained(model_load_path, **init_kwargs)
         processor = model.processor
         logger.info("Model and Processor initialized.")
+
+        # Log which fusion method is being used
+        if args.use_dynamic_fusion:
+            logger.info("Using Dynamic Multi-Scale Fusion")
+        else:
+            logger.info(f"Using standard fusion method: {args.fusion_method}")
+        
+        if args.use_feature_enhancer:
+            logger.info("Using Local Feature Enhancer for diacritical marks")
 
     except Exception as model_init_e:
         logger.error(f"FATAL: Model init failed: {model_init_e}", exc_info=True)
@@ -321,7 +337,7 @@ def main():
         except Exception as e: logger.error(f"Wandb init failed: {e}")
 
     # --- Start Training (Use the standard CTC trainer) ---
-    logger.info("============ Starting Hierarchical Transformer CTC Training Phase ============")
+    logger.info("============ Starting Hierarchical Multi-Scale CTC Training Phase ============")
     trained_model = train_ctc_model(
         model=model,
         optimizer=optimizer,
