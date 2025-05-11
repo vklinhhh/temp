@@ -1,0 +1,1048 @@
+2025-05-10 21:15:36,394 - TrainHierarchicalMultiScaleScript - INFO - Device: cuda
+2025-05-10 21:15:36,394 - TrainHierarchicalMultiScaleScript - INFO - Building COMBINED char vocab from generator...
+2025-05-10 21:15:36,394 - utils.ctc_utils - INFO - Built CTC vocab with 229 tokens (Blank: True, UNK: True)
+2025-05-10 21:15:36,394 - TrainHierarchicalMultiScaleScript - INFO - Saved generated COMBINED vocab to outputs/dynamic_fusion_large/combined_char_vocab.json
+2025-05-10 21:15:36,394 - TrainHierarchicalMultiScaleScript - INFO - Loading dataset: vklinhhh/vnhwt_opt_1
+2025-05-10 21:15:42,934 - TrainHierarchicalMultiScaleScript - WARNING - Splitting train set for validation.
+2025-05-10 21:15:42,941 - TrainHierarchicalMultiScaleScript - INFO - Train size: 292050, Val size: 32451
+2025-05-10 21:15:42,941 - TrainHierarchicalMultiScaleScript - INFO - Initializing HierarchicalCtcMultiScaleOcrModel configuration...
+2025-05-10 21:15:42,941 - TrainHierarchicalMultiScaleScript - INFO - Instantiating/Loading model from: microsoft/trocr-base-handwritten
+2025-05-10 21:15:42,941 - model.hierarchical_ctc_model - INFO - Loading HierarchicalCtcMultiScaleOcrModel from: microsoft/trocr-base-handwritten
+2025-05-10 21:15:42,941 - model.hierarchical_ctc_model - WARNING - Config not found at microsoft/trocr-base-handwritten/config.json. Initializing new from kwargs.
+2025-05-10 21:15:42,941 - model.hierarchical_ctc_model - INFO - Initializing HierarchicalCtcMultiScaleOcrModel...
+2025-05-10 21:15:47,172 - model.hierarchical_ctc_model - INFO - Processor and Vision Encoder loaded.
+2025-05-10 21:15:47,173 - model.hierarchical_ctc_model - INFO - Using Dynamic Multi-Scale Fusion with 2 layers
+2025-05-10 21:15:47,184 - model.hierarchical_ctc_model - INFO - Using Local Feature Enhancer for diacritical marks
+2025-05-10 21:15:47,219 - model.hierarchical_ctc_model - INFO - Using Positional Encoding: sinusoidal_1d
+2025-05-10 21:15:47,219 - model.hierarchical_ctc_model - INFO - Adding 6 Transformer Encoder layers...
+2025-05-10 21:15:47,249 - model.hierarchical_ctc_model - INFO - Added 1 shared layer(s) (Output: 768)
+2025-05-10 21:15:47,249 - model.hierarchical_ctc_model - INFO - Base Classifier Head (Out: 97)
+2025-05-10 21:15:47,251 - model.hierarchical_ctc_model - INFO - 'concat_proj' conditioning for diacritic head.
+2025-05-10 21:15:47,257 - model.hierarchical_ctc_model - INFO - Visual Diacritic Attn on.
+2025-05-10 21:15:47,258 - model.diacritic_attention - INFO - Found 12 vowels, 42 consonants, 0 special vowels in base vocabulary
+2025-05-10 21:15:47,258 - model.diacritic_attention - INFO - Found 5 tone marks, 3 modifiers, 15 combined diacritics in diacritic vocabulary
+2025-05-10 21:15:47,259 - model.diacritic_attention - INFO - Initialized character-diacritic compatibility matrix with linguistic priors
+2025-05-10 21:15:47,259 - model.hierarchical_ctc_model - INFO - Char-Diac Compat on.
+2025-05-10 21:15:47,266 - model.hierarchical_ctc_model - INFO - Few-Shot Adapter on.
+2025-05-10 21:15:47,266 - model.hierarchical_ctc_model - INFO - Diacritic Classifier Head (In: 768, Out: 27)
+2025-05-10 21:15:47,267 - model.hierarchical_ctc_model - INFO - Final Combined Classifier Head (In: 768, Out: 229)
+2025-05-10 21:15:47,293 - model.hierarchical_ctc_model - INFO - Initialized HierarchicalCtcMultiScaleOcrModel with multi-scale fusion capabilities
+2025-05-10 21:15:47,293 - model.hierarchical_ctc_model - INFO - Loading base weights only.
+2025-05-10 21:15:47,293 - TrainHierarchicalMultiScaleScript - INFO - Model and Processor initialized.
+2025-05-10 21:15:47,293 - TrainHierarchicalMultiScaleScript - INFO - Using Dynamic Multi-Scale Fusion
+2025-05-10 21:15:47,293 - TrainHierarchicalMultiScaleScript - INFO - Using Local Feature Enhancer for diacritical marks
+2025-05-10 21:15:47,293 - TrainHierarchicalMultiScaleScript - INFO - Creating CTC dataset wrappers (using combined vocab)...
+2025-05-10 21:15:47,296 - data.ctc_ocr_dataset - INFO - Training augmentations enabled.
+2025-05-10 21:15:47,296 - data.ctc_ocr_dataset - INFO - Training augmentations disabled (validation/test mode).
+2025-05-10 21:15:47,296 - TrainHierarchicalMultiScaleScript - INFO - CTC Dataset wrappers created.
+2025-05-10 21:15:47,459 - TrainHierarchicalMultiScaleScript - INFO - Model on device: cuda
+2025-05-10 21:15:47,460 - utils.optimizers - INFO - Using discriminative learning rate: Encoder LR = 5e-06, Decoder/Other LR = 5e-05
+2025-05-10 21:15:47,460 - TrainHierarchicalMultiScaleScript - INFO - Scheduler Setup: Steps per epoch=18254, Total Steps=456350, Warmup=22817
+2025-05-10 21:15:47,460 - utils.schedulers - INFO - CosineWarmupScheduler initialized: warmup=22817, max_steps=456350, eta_min=0
+2025-05-10 21:15:47,460 - TrainHierarchicalMultiScaleScript - INFO - Optimizer/Scheduler created.
+2025-05-10 21:15:47,460 - TrainHierarchicalMultiScaleScript - INFO - No checkpoint found to resume from.
+2025-05-10 21:15:47,460 - TrainHierarchicalMultiScaleScript - INFO - Starting fresh or from base weights.
+2025-05-10 21:15:47,460 - TrainHierarchicalMultiScaleScript - INFO - ============ Starting Hierarchical Multi-Scale CTC Training Phase ============
+2025-05-10 21:15:47,460 - CtcTrainer - INFO - Trainer using device: cuda
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - Train DataLoader: 18254 batches, Val DataLoader: 2029 batches
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - Trainer starting with default GradScaler state.
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - Using combined_char_vocab for validation decoder.
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - Validation CTCDecoder initialized (Blank Index: 0).
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - --- Starting Training Loop from Epoch 1 ---
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - Starting with default GradScaler state.
+2025-05-10 21:15:47,461 - CtcTrainer - INFO - Starting Epoch 1/25
+2025-05-10 21:43:09,725 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-10 21:53:37,225 - CtcTrainer - INFO - Running end-of-epoch 1 validation...
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Prediction  : 'ruật'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Prediction  : 'er ged ih bo er  et derrde e e'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 21:53:37,753 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-10 21:53:37,754 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-10 21:53:37,754 - training.ctc_validation - INFO -   Prediction  : 'đnh'
+2025-05-10 21:53:37,754 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 21:56:43,002 - training.ctc_validation - INFO - Validation Results: Loss=18.3856, CER=0.3684, WER=0.7365
+2025-05-10 21:56:43,002 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-10 21:56:43,004 - CtcTrainer - INFO - --- Epoch 1/25 Summary ---
+2025-05-10 21:56:43,004 - CtcTrainer - INFO - Avg Train Loss: 10.8270
+2025-05-10 21:56:43,004 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 18.385615291538446, 'val_cer': 0.3683574096866835, 'val_wer': 0.7365464411107565}
+2025-05-10 21:56:43,004 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: inf
+2025-05-10 21:56:43,004 - CtcTrainer - INFO - ---------------------
+2025-05-10 21:56:43,005 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-10 21:56:43,781 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-10 21:56:43,781 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-10 21:56:44,521 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-10 21:56:44,521 - CtcTrainer - INFO - New best metric (val_cer) at epoch 1: 0.3684
+2025-05-10 21:56:44,522 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-10 21:56:44,522 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-10 21:56:44,522 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-10 21:56:44,845 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-10 21:56:44,845 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-10 21:56:45,083 - CtcTrainer - INFO - Starting Epoch 2/25
+2025-05-10 22:08:44,573 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-10 22:35:33,355 - CtcTrainer - INFO - Running end-of-epoch 2 validation...
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Prediction  : 'ruỘt'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Prediction  : 'haor guid ihe boer i Hirte og Hsetder a dar g'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-10 22:35:33,793 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 22:38:39,294 - training.ctc_validation - INFO - Validation Results: Loss=11.7551, CER=0.2343, WER=0.5527
+2025-05-10 22:38:39,294 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-10 22:38:39,295 - CtcTrainer - INFO - --- Epoch 2/25 Summary ---
+2025-05-10 22:38:39,295 - CtcTrainer - INFO - Avg Train Loss: 1.3544
+2025-05-10 22:38:39,295 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 11.755065340286212, 'val_cer': 0.23429038937233534, 'val_wer': 0.552739653154591}
+2025-05-10 22:38:39,295 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.3684
+2025-05-10 22:38:39,295 - CtcTrainer - INFO - ---------------------
+2025-05-10 22:38:39,296 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-10 22:38:40,654 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-10 22:38:40,654 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-10 22:38:41,778 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-10 22:38:41,778 - CtcTrainer - INFO - New best metric (val_cer) at epoch 2: 0.2343
+2025-05-10 22:38:41,780 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-10 22:38:41,780 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-10 22:38:41,781 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-10 22:38:42,235 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-10 22:38:42,235 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-10 22:38:42,460 - CtcTrainer - INFO - Starting Epoch 3/25
+2025-05-10 22:43:00,005 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-10 23:16:38,287 - CtcTrainer - INFO - Running end-of-epoch 3 validation...
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Prediction  : 'muột'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Prediction  : 'havor Guid ie boer: Mierte ogi Heet ,der er dar eeg'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-10 23:16:38,698 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-10 23:16:38,699 - training.ctc_validation - INFO -   Prediction  : 'địk'
+2025-05-10 23:16:38,699 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:19:44,364 - training.ctc_validation - INFO - Validation Results: Loss=9.9302, CER=0.2035, WER=0.5055
+2025-05-10 23:19:44,364 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-10 23:19:44,366 - CtcTrainer - INFO - --- Epoch 3/25 Summary ---
+2025-05-10 23:19:44,366 - CtcTrainer - INFO - Avg Train Loss: 1.2419
+2025-05-10 23:19:44,366 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 9.930223518305283, 'val_cer': 0.2034745764745117, 'val_wer': 0.5055431428875412}
+2025-05-10 23:19:44,366 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.2343
+2025-05-10 23:19:44,366 - CtcTrainer - INFO - ---------------------
+2025-05-10 23:19:44,367 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-10 23:19:45,773 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-10 23:19:45,773 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-10 23:19:47,013 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-10 23:19:47,013 - CtcTrainer - INFO - New best metric (val_cer) at epoch 3: 0.2035
+2025-05-10 23:19:47,026 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-10 23:19:47,026 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-10 23:19:47,026 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-10 23:19:47,529 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-10 23:19:47,529 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-10 23:19:47,751 - CtcTrainer - INFO - Starting Epoch 4/25
+2025-05-10 23:43:06,486 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-10 23:57:44,254 - CtcTrainer - INFO - Running end-of-epoch 4 validation...
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Prediction  : 'muật'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Prediction  : 'hor Gund ike boeri Hiertter g Hiet, der ar dor eve'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - ---------------------------------
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO -   Prediction  : 'địh'
+2025-05-10 23:57:44,680 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 00:00:50,238 - training.ctc_validation - INFO - Validation Results: Loss=9.7494, CER=0.1999, WER=0.4985
+2025-05-11 00:00:50,238 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 00:00:50,239 - CtcTrainer - INFO - --- Epoch 4/25 Summary ---
+2025-05-11 00:00:50,239 - CtcTrainer - INFO - Avg Train Loss: 1.2310
+2025-05-11 00:00:50,239 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 9.74935829367962, 'val_cer': 0.19990451032752, 'val_wer': 0.498478561549101}
+2025-05-11 00:00:50,239 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.2035
+2025-05-11 00:00:50,239 - CtcTrainer - INFO - ---------------------
+2025-05-11 00:00:50,240 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 00:00:51,473 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 00:00:51,473 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 00:00:52,588 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 00:00:52,588 - CtcTrainer - INFO - New best metric (val_cer) at epoch 4: 0.1999
+2025-05-11 00:00:52,589 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 00:00:52,590 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 00:00:52,590 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 00:00:53,054 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 00:00:53,054 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 00:00:53,274 - CtcTrainer - INFO - Starting Epoch 5/25
+2025-05-11 00:07:32,428 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 00:38:49,595 - CtcTrainer - INFO - Running end-of-epoch 5 validation...
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO -   Prediction  : 'ruật'
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 00:38:50,001 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO -   Prediction  : 'hvr gud ie bori Hiortr gi Het, der er dor eveg'
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 00:38:50,002 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 00:41:55,529 - training.ctc_validation - INFO - Validation Results: Loss=9.7751, CER=0.2022, WER=0.4940
+2025-05-11 00:41:55,529 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 00:41:55,531 - CtcTrainer - INFO - --- Epoch 5/25 Summary ---
+2025-05-11 00:41:55,531 - CtcTrainer - INFO - Avg Train Loss: 1.1879
+2025-05-11 00:41:55,531 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 9.775059434152459, 'val_cer': 0.20217179023941997, 'val_wer': 0.4939780827747633}
+2025-05-11 00:41:55,531 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1999
+2025-05-11 00:41:55,531 - CtcTrainer - INFO - ---------------------
+2025-05-11 00:41:55,532 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 00:41:56,748 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 00:41:56,749 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=1, patience=10
+2025-05-11 00:41:56,966 - CtcTrainer - INFO - Starting Epoch 6/25
+2025-05-11 01:14:55,848 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 01:19:55,397 - CtcTrainer - INFO - Running end-of-epoch 6 validation...
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Prediction  : 'suật'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Prediction  : 'hvor Gud ise boer, Hyeter ogi Meset,der a r dar a'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 01:19:55,847 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 01:23:01,518 - training.ctc_validation - INFO - Validation Results: Loss=9.4411, CER=0.1889, WER=0.4778
+2025-05-11 01:23:01,518 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 01:23:01,519 - CtcTrainer - INFO - --- Epoch 6/25 Summary ---
+2025-05-11 01:23:01,519 - CtcTrainer - INFO - Avg Train Loss: 1.1437
+2025-05-11 01:23:01,519 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 9.44112194123347, 'val_cer': 0.1888896086602895, 'val_wer': 0.47784870730928825}
+2025-05-11 01:23:01,519 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1999
+2025-05-11 01:23:01,519 - CtcTrainer - INFO - ---------------------
+2025-05-11 01:23:01,520 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 01:23:02,837 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 01:23:02,837 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 01:23:04,085 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 01:23:04,085 - CtcTrainer - INFO - New best metric (val_cer) at epoch 6: 0.1889
+2025-05-11 01:23:04,098 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 01:23:04,098 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 01:23:04,098 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 01:23:04,594 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 01:23:04,594 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 01:23:04,819 - CtcTrainer - INFO - Starting Epoch 7/25
+2025-05-11 01:33:29,276 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 02:01:02,242 - CtcTrainer - INFO - Running end-of-epoch 7 validation...
+2025-05-11 02:01:02,685 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Prediction  : 'hrvro gud ike oeri Mjerte oog Heset, der er dor evieg'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 02:01:02,686 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:04:08,135 - training.ctc_validation - INFO - Validation Results: Loss=9.0050, CER=0.1764, WER=0.4487
+2025-05-11 02:04:08,135 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 02:04:08,136 - CtcTrainer - INFO - --- Epoch 7/25 Summary ---
+2025-05-11 02:04:08,136 - CtcTrainer - INFO - Avg Train Loss: 1.0699
+2025-05-11 02:04:08,136 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 9.005038800009896, 'val_cer': 0.17636078781379033, 'val_wer': 0.4486647515693159}
+2025-05-11 02:04:08,136 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1889
+2025-05-11 02:04:08,136 - CtcTrainer - INFO - ---------------------
+2025-05-11 02:04:08,137 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 02:04:09,377 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 02:04:09,377 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 02:04:10,583 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 02:04:10,583 - CtcTrainer - INFO - New best metric (val_cer) at epoch 7: 0.1764
+2025-05-11 02:04:10,584 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 02:04:10,585 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 02:04:10,585 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 02:04:11,083 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 02:04:11,083 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 02:04:11,303 - CtcTrainer - INFO - Starting Epoch 8/25
+2025-05-11 02:32:09,153 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 02:42:09,306 - CtcTrainer - INFO - Running end-of-epoch 8 validation...
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Prediction  : 'hovor Gund ikle boer Mjiteer og i dest, der er der aeg'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 02:42:09,715 - training.ctc_validation - INFO -   Prediction  : 'đinh'
+2025-05-11 02:42:09,716 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 02:45:15,310 - training.ctc_validation - INFO - Validation Results: Loss=8.6681, CER=0.1772, WER=0.4405
+2025-05-11 02:45:15,310 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 02:45:15,312 - CtcTrainer - INFO - --- Epoch 8/25 Summary ---
+2025-05-11 02:45:15,312 - CtcTrainer - INFO - Avg Train Loss: 1.0066
+2025-05-11 02:45:15,312 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 8.66807229674427, 'val_cer': 0.17724130816052822, 'val_wer': 0.4404830301095861}
+2025-05-11 02:45:15,312 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1764
+2025-05-11 02:45:15,312 - CtcTrainer - INFO - ---------------------
+2025-05-11 02:45:15,313 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 02:45:16,579 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 02:45:16,579 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=1, patience=10
+2025-05-11 02:45:16,795 - CtcTrainer - INFO - Starting Epoch 9/25
+2025-05-11 03:15:59,276 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 03:23:13,777 - CtcTrainer - INFO - Running end-of-epoch 9 validation...
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Prediction  : 'hvor Gund ike boer Mrgrter ogii Meget, der ar der avg'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO -   Prediction  : 'dịnh'
+2025-05-11 03:23:14,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 03:26:19,780 - training.ctc_validation - INFO - Validation Results: Loss=7.7454, CER=0.1574, WER=0.4014
+2025-05-11 03:26:19,780 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 03:26:19,781 - CtcTrainer - INFO - --- Epoch 9/25 Summary ---
+2025-05-11 03:26:19,781 - CtcTrainer - INFO - Avg Train Loss: 0.9695
+2025-05-11 03:26:19,781 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 7.745407536056926, 'val_cer': 0.1573780167418828, 'val_wer': 0.40142568358335995}
+2025-05-11 03:26:19,781 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1764
+2025-05-11 03:26:19,781 - CtcTrainer - INFO - ---------------------
+2025-05-11 03:26:19,782 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 03:26:21,021 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 03:26:21,021 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 03:26:22,170 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 03:26:22,170 - CtcTrainer - INFO - New best metric (val_cer) at epoch 9: 0.1574
+2025-05-11 03:26:22,171 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 03:26:22,172 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 03:26:22,172 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 03:26:22,623 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 03:26:22,623 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 03:26:22,842 - CtcTrainer - INFO - Starting Epoch 10/25
+2025-05-11 03:37:58,102 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 04:04:20,484 - CtcTrainer - INFO - Running end-of-epoch 10 validation...
+2025-05-11 04:04:20,897 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Prediction  : 'ruật'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Prediction  : 'ovor Gud ike bor i Hperte ogi Meset, der ar dor ar'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 04:04:20,898 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:07:26,277 - training.ctc_validation - INFO - Validation Results: Loss=7.3926, CER=0.1495, WER=0.3883
+2025-05-11 04:07:26,277 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 04:07:26,278 - CtcTrainer - INFO - --- Epoch 10/25 Summary ---
+2025-05-11 04:07:26,278 - CtcTrainer - INFO - Avg Train Loss: 0.9305
+2025-05-11 04:07:26,278 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 7.392606858534752, 'val_cer': 0.1495229115233002, 'val_wer': 0.38827534844132355}
+2025-05-11 04:07:26,278 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1574
+2025-05-11 04:07:26,278 - CtcTrainer - INFO - ---------------------
+2025-05-11 04:07:26,279 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 04:07:27,444 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 04:07:27,444 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 04:07:28,563 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 04:07:28,563 - CtcTrainer - INFO - New best metric (val_cer) at epoch 10: 0.1495
+2025-05-11 04:07:28,564 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 04:07:28,564 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 04:07:28,565 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 04:07:29,220 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 04:07:29,220 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 04:07:29,438 - CtcTrainer - INFO - Starting Epoch 11/25
+2025-05-11 04:42:24,516 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 04:45:26,692 - CtcTrainer - INFO - Running end-of-epoch 11 validation...
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Prediction  : 'suật'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Prediction  : 'hvor Gud ikkeboer i  Hjerter og i Miset, der ar dar eve'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 04:45:27,135 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 04:48:32,764 - training.ctc_validation - INFO - Validation Results: Loss=6.7331, CER=0.1326, WER=0.3532
+2025-05-11 04:48:32,764 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 04:48:32,766 - CtcTrainer - INFO - --- Epoch 11/25 Summary ---
+2025-05-11 04:48:32,766 - CtcTrainer - INFO - Avg Train Loss: 0.8906
+2025-05-11 04:48:32,766 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 6.733071341102713, 'val_cer': 0.1325507018970775, 'val_wer': 0.35318650920310674}
+2025-05-11 04:48:32,766 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1495
+2025-05-11 04:48:32,766 - CtcTrainer - INFO - ---------------------
+2025-05-11 04:48:32,767 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 04:48:34,144 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 04:48:34,144 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 04:48:35,299 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 04:48:35,299 - CtcTrainer - INFO - New best metric (val_cer) at epoch 11: 0.1326
+2025-05-11 04:48:35,301 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 04:48:35,301 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 04:48:35,301 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 04:48:35,758 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 04:48:35,758 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 04:48:35,979 - CtcTrainer - INFO - Starting Epoch 12/25
+2025-05-11 04:56:01,687 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 05:26:33,944 - CtcTrainer - INFO - Running end-of-epoch 12 validation...
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Prediction  : 'ruật'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Prediction  : 'hvor Gund ike boeri Hjerter ogi Keset, der ar dar evig'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 05:26:34,359 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 05:29:39,916 - training.ctc_validation - INFO - Validation Results: Loss=6.5627, CER=0.1324, WER=0.3546
+2025-05-11 05:29:39,916 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 05:29:39,918 - CtcTrainer - INFO - --- Epoch 12/25 Summary ---
+2025-05-11 05:29:39,918 - CtcTrainer - INFO - Avg Train Loss: 0.8747
+2025-05-11 05:29:39,918 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 6.562744263294742, 'val_cer': 0.1323971506649488, 'val_wer': 0.3546015533567401}
+2025-05-11 05:29:39,918 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1326
+2025-05-11 05:29:39,918 - CtcTrainer - INFO - ---------------------
+2025-05-11 05:29:39,919 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 05:29:41,187 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 05:29:41,187 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 05:29:44,033 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 05:29:44,034 - CtcTrainer - INFO - New best metric (val_cer) at epoch 12: 0.1324
+2025-05-11 05:29:44,035 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 05:29:44,035 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 05:29:44,035 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 05:29:44,485 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 05:29:44,485 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 05:29:44,703 - CtcTrainer - INFO - Starting Epoch 13/25
+2025-05-11 05:41:00,567 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 06:07:42,095 - CtcTrainer - INFO - Running end-of-epoch 13 validation...
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Prediction  : 'hvorGund ike boeri Hjerter og i  Meset, der ar dar eveg'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO -   Prediction  : 'ịnh'
+2025-05-11 06:07:42,497 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:10:48,072 - training.ctc_validation - INFO - Validation Results: Loss=6.6820, CER=0.1369, WER=0.3675
+2025-05-11 06:10:48,072 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 06:10:48,073 - CtcTrainer - INFO - --- Epoch 13/25 Summary ---
+2025-05-11 06:10:48,074 - CtcTrainer - INFO - Avg Train Loss: 0.8513
+2025-05-11 06:10:48,074 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 6.6820122852615205, 'val_cer': 0.13690771810872868, 'val_wer': 0.36750718161506546}
+2025-05-11 06:10:48,074 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1324
+2025-05-11 06:10:48,074 - CtcTrainer - INFO - ---------------------
+2025-05-11 06:10:48,075 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 06:10:49,318 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 06:10:49,319 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=1, patience=10
+2025-05-11 06:10:49,535 - CtcTrainer - INFO - Starting Epoch 14/25
+2025-05-11 06:25:33,609 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 06:48:46,223 - CtcTrainer - INFO - Running end-of-epoch 14 validation...
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Prediction  : 'ruật'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Prediction  : 'hovor Gund ikhe boer Mjerter og i Heset, der ar dar eveg'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 06:48:46,628 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 06:51:52,168 - training.ctc_validation - INFO - Validation Results: Loss=5.7253, CER=0.1177, WER=0.3205
+2025-05-11 06:51:52,168 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 06:51:52,169 - CtcTrainer - INFO - --- Epoch 14/25 Summary ---
+2025-05-11 06:51:52,169 - CtcTrainer - INFO - Avg Train Loss: 0.8221
+2025-05-11 06:51:52,169 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 5.725251159988741, 'val_cer': 0.11771141485464216, 'val_wer': 0.3205340993722737}
+2025-05-11 06:51:52,169 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1324
+2025-05-11 06:51:52,169 - CtcTrainer - INFO - ---------------------
+2025-05-11 06:51:52,170 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 06:51:53,318 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 06:51:53,318 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 06:51:54,436 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 06:51:54,436 - CtcTrainer - INFO - New best metric (val_cer) at epoch 14: 0.1177
+2025-05-11 06:51:54,437 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 06:51:54,437 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 06:51:54,438 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 06:51:54,888 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 06:51:54,889 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 06:51:55,109 - CtcTrainer - INFO - Starting Epoch 15/25
+2025-05-11 07:26:26,863 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 07:29:52,169 - CtcTrainer - INFO - Running end-of-epoch 15 validation...
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Prediction  : 'hovor Gund ike boeri Hjerter og i Heset, der ar dar evig'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 07:29:52,615 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 07:32:57,953 - training.ctc_validation - INFO - Validation Results: Loss=5.2312, CER=0.1050, WER=0.2915
+2025-05-11 07:32:57,953 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 07:32:57,954 - CtcTrainer - INFO - --- Epoch 15/25 Summary ---
+2025-05-11 07:32:57,954 - CtcTrainer - INFO - Avg Train Loss: 0.7871
+2025-05-11 07:32:57,954 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 5.2311741958204205, 'val_cer': 0.1050194458240063, 'val_wer': 0.291456537929567}
+2025-05-11 07:32:57,954 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1177
+2025-05-11 07:32:57,954 - CtcTrainer - INFO - ---------------------
+2025-05-11 07:32:57,955 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 07:32:59,185 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 07:32:59,185 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 07:33:00,330 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 07:33:00,331 - CtcTrainer - INFO - New best metric (val_cer) at epoch 15: 0.1050
+2025-05-11 07:33:00,332 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 07:33:00,332 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 07:33:00,333 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 07:33:00,779 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 07:33:00,779 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 07:33:00,999 - CtcTrainer - INFO - Starting Epoch 16/25
+2025-05-11 08:00:24,232 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 08:10:57,462 - CtcTrainer - INFO - Running end-of-epoch 16 validation...
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Prediction  : 'havor Gund ike boer Hjerter og i Heset, der ar dar eveg'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 08:10:57,910 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:14:03,671 - training.ctc_validation - INFO - Validation Results: Loss=5.2975, CER=0.1042, WER=0.2946
+2025-05-11 08:14:03,671 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 08:14:03,672 - CtcTrainer - INFO - --- Epoch 16/25 Summary ---
+2025-05-11 08:14:03,672 - CtcTrainer - INFO - Avg Train Loss: 0.7700
+2025-05-11 08:14:03,672 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 5.2975099694801955, 'val_cer': 0.10418691023730862, 'val_wer': 0.294573890839451}
+2025-05-11 08:14:03,672 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1050
+2025-05-11 08:14:03,672 - CtcTrainer - INFO - ---------------------
+2025-05-11 08:14:03,673 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 08:14:04,861 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 08:14:04,861 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 08:14:05,989 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 08:14:05,989 - CtcTrainer - INFO - New best metric (val_cer) at epoch 16: 0.1042
+2025-05-11 08:14:05,990 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 08:14:05,990 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 08:14:05,991 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 08:14:06,456 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 08:14:06,456 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 08:14:06,676 - CtcTrainer - INFO - Starting Epoch 17/25
+2025-05-11 08:34:01,106 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 08:52:03,804 - CtcTrainer - INFO - Running end-of-epoch 17 validation...
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO -   Prediction  : 'hvor Gund ike boeri Hjeerter og i Heset, der ar dar evreg'
+2025-05-11 08:52:04,243 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 08:52:04,244 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 08:55:09,883 - training.ctc_validation - INFO - Validation Results: Loss=4.7868, CER=0.0957, WER=0.2687
+2025-05-11 08:55:09,883 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 08:55:09,885 - CtcTrainer - INFO - --- Epoch 17/25 Summary ---
+2025-05-11 08:55:09,885 - CtcTrainer - INFO - Avg Train Loss: 0.7593
+2025-05-11 08:55:09,885 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 4.786849235335593, 'val_cer': 0.09571280161420732, 'val_wer': 0.2687307160336206}
+2025-05-11 08:55:09,885 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.1042
+2025-05-11 08:55:09,885 - CtcTrainer - INFO - ---------------------
+2025-05-11 08:55:09,886 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 08:55:11,108 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 08:55:11,108 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 08:55:12,269 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 08:55:12,270 - CtcTrainer - INFO - New best metric (val_cer) at epoch 17: 0.0957
+2025-05-11 08:55:12,271 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 08:55:12,271 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 08:55:12,272 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 08:55:12,728 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 08:55:12,729 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 08:55:12,949 - CtcTrainer - INFO - Starting Epoch 18/25
+2025-05-11 09:04:48,252 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 09:33:10,421 - CtcTrainer - INFO - Running end-of-epoch 18 validation...
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Prediction  : 'hvor Gund ikke boer i Hjerter og i Heset, der ar dar eveg'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 09:33:10,826 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 09:36:16,384 - training.ctc_validation - INFO - Validation Results: Loss=4.5159, CER=0.0905, WER=0.2565
+2025-05-11 09:36:16,384 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 09:36:16,385 - CtcTrainer - INFO - --- Epoch 18/25 Summary ---
+2025-05-11 09:36:16,385 - CtcTrainer - INFO - Avg Train Loss: 0.7257
+2025-05-11 09:36:16,385 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 4.515854398001765, 'val_cer': 0.09046086962780621, 'val_wer': 0.2564953718480689}
+2025-05-11 09:36:16,385 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0957
+2025-05-11 09:36:16,385 - CtcTrainer - INFO - ---------------------
+2025-05-11 09:36:16,386 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 09:36:17,610 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 09:36:17,610 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 09:36:18,766 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 09:36:18,767 - CtcTrainer - INFO - New best metric (val_cer) at epoch 18: 0.0905
+2025-05-11 09:36:18,768 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 09:36:18,768 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 09:36:18,769 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 09:36:19,228 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 09:36:19,228 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 09:36:19,449 - CtcTrainer - INFO - Starting Epoch 19/25
+2025-05-11 09:58:31,638 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 10:14:17,029 - CtcTrainer - INFO - Running end-of-epoch 19 validation...
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Prediction  : 'ruột'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Prediction  : 'hovor Gund ike boer i Hjerter og i Heset, der ar dar evig'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 10:14:17,435 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:17:23,231 - training.ctc_validation - INFO - Validation Results: Loss=4.3208, CER=0.0866, WER=0.2498
+2025-05-11 10:17:23,231 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 10:17:23,232 - CtcTrainer - INFO - --- Epoch 19/25 Summary ---
+2025-05-11 10:17:23,232 - CtcTrainer - INFO - Avg Train Loss: 0.7083
+2025-05-11 10:17:23,232 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 4.3208435931957645, 'val_cer': 0.08655011168452899, 'val_wer': 0.24977125226087882}
+2025-05-11 10:17:23,232 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0905
+2025-05-11 10:17:23,232 - CtcTrainer - INFO - ---------------------
+2025-05-11 10:17:23,234 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 10:17:24,472 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 10:17:24,472 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 10:17:27,753 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 10:17:27,753 - CtcTrainer - INFO - New best metric (val_cer) at epoch 19: 0.0866
+2025-05-11 10:17:27,754 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 10:17:27,755 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 10:17:27,755 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 10:17:28,203 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 10:17:28,203 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 10:17:28,423 - CtcTrainer - INFO - Starting Epoch 20/25
+2025-05-11 10:42:36,183 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 10:55:26,357 - CtcTrainer - INFO - Running end-of-epoch 20 validation...
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Prediction  : 'havor Gund ike boer i Hjerter og i Heuset, der ar dar eveg'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 10:55:26,774 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 10:58:32,613 - training.ctc_validation - INFO - Validation Results: Loss=4.0942, CER=0.0827, WER=0.2367
+2025-05-11 10:58:32,613 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 10:58:32,614 - CtcTrainer - INFO - --- Epoch 20/25 Summary ---
+2025-05-11 10:58:32,614 - CtcTrainer - INFO - Avg Train Loss: 0.6888
+2025-05-11 10:58:32,614 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 4.0941805958285, 'val_cer': 0.08266814459727591, 'val_wer': 0.23668475369720182}
+2025-05-11 10:58:32,614 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0866
+2025-05-11 10:58:32,614 - CtcTrainer - INFO - ---------------------
+2025-05-11 10:58:32,615 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 10:58:33,829 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 10:58:33,830 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 10:58:34,968 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 10:58:34,968 - CtcTrainer - INFO - New best metric (val_cer) at epoch 20: 0.0827
+2025-05-11 10:58:34,969 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 10:58:34,970 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 10:58:34,970 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 10:58:35,418 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 10:58:35,418 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 10:58:35,637 - CtcTrainer - INFO - Starting Epoch 21/25
+2025-05-11 11:15:32,154 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 11:36:33,281 - CtcTrainer - INFO - Running end-of-epoch 21 validation...
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Prediction  : 'hovor Gud ike boer i Hjerter og i Huset, der er dar eveg'
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 11:36:33,695 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 11:36:33,696 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 11:36:33,696 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 11:36:33,696 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 11:36:33,696 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 11:36:33,696 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 11:36:33,696 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 11:39:39,556 - training.ctc_validation - INFO - Validation Results: Loss=3.9453, CER=0.0798, WER=0.2301
+2025-05-11 11:39:39,556 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 11:39:39,557 - CtcTrainer - INFO - --- Epoch 21/25 Summary ---
+2025-05-11 11:39:39,557 - CtcTrainer - INFO - Avg Train Loss: 0.6768
+2025-05-11 11:39:39,557 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 3.945298531403259, 'val_cer': 0.07982504756489339, 'val_wer': 0.23009894669645706}
+2025-05-11 11:39:39,557 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0827
+2025-05-11 11:39:39,557 - CtcTrainer - INFO - ---------------------
+2025-05-11 11:39:39,558 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 11:39:40,794 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 11:39:40,794 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 11:39:41,957 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 11:39:41,957 - CtcTrainer - INFO - New best metric (val_cer) at epoch 21: 0.0798
+2025-05-11 11:39:41,958 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 11:39:41,958 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 11:39:41,958 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 11:39:42,408 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 11:39:42,409 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 11:39:42,629 - CtcTrainer - INFO - Starting Epoch 22/25
+2025-05-11 11:43:53,157 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 12:17:39,779 - CtcTrainer - INFO - Running end-of-epoch 22 validation...
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 12:17:40,185 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO -   Prediction  : 'hvor Gud ikke boer i Hjerter og i Heset, der ar dar eveg'
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 12:17:40,186 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:20:46,208 - training.ctc_validation - INFO - Validation Results: Loss=3.8818, CER=0.0787, WER=0.2259
+2025-05-11 12:20:46,208 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 12:20:46,210 - CtcTrainer - INFO - --- Epoch 22/25 Summary ---
+2025-05-11 12:20:46,210 - CtcTrainer - INFO - Avg Train Loss: 0.6606
+2025-05-11 12:20:46,210 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 3.881841069525855, 'val_cer': 0.07869260722794441, 'val_wer': 0.22591765081391638}
+2025-05-11 12:20:46,210 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0798
+2025-05-11 12:20:46,210 - CtcTrainer - INFO - ---------------------
+2025-05-11 12:20:46,211 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 12:20:47,510 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 12:20:47,510 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 12:20:48,777 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 12:20:48,777 - CtcTrainer - INFO - New best metric (val_cer) at epoch 22: 0.0787
+2025-05-11 12:20:48,778 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 12:20:48,778 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 12:20:48,779 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 12:20:49,269 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 12:20:49,269 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 12:20:49,490 - CtcTrainer - INFO - Starting Epoch 23/25
+2025-05-11 12:23:15,728 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 12:58:46,124 - CtcTrainer - INFO - Running end-of-epoch 23 validation...
+2025-05-11 12:58:46,581 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 12:58:46,581 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 12:58:46,581 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 12:58:46,581 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Prediction  : 'hvor Gund ike boeri Hjerter og i Heset, der aer dar eveg'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 12:58:46,582 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 13:01:52,405 - training.ctc_validation - INFO - Validation Results: Loss=3.7848, CER=0.0775, WER=0.2230
+2025-05-11 13:01:52,405 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 13:01:52,406 - CtcTrainer - INFO - --- Epoch 23/25 Summary ---
+2025-05-11 13:01:52,406 - CtcTrainer - INFO - Avg Train Loss: 0.6586
+2025-05-11 13:01:52,406 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 3.784802215168617, 'val_cer': 0.07749058898893711, 'val_wer': 0.22299180763911056}
+2025-05-11 13:01:52,406 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0787
+2025-05-11 13:01:52,406 - CtcTrainer - INFO - ---------------------
+2025-05-11 13:01:52,407 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 13:01:53,660 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 13:01:53,660 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 13:01:54,827 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 13:01:54,828 - CtcTrainer - INFO - New best metric (val_cer) at epoch 23: 0.0775
+2025-05-11 13:01:54,830 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 13:01:54,830 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 13:01:54,830 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 13:01:55,293 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 13:01:55,293 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 13:01:55,515 - CtcTrainer - INFO - Starting Epoch 24/25
+2025-05-11 13:20:41,741 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 13:39:52,719 - CtcTrainer - INFO - Running end-of-epoch 24 validation...
+2025-05-11 13:39:53,133 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 13:39:53,133 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Prediction  : 'hovor Gund ikke boer i Hjerter og i Huset, der ar dar eveg'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 13:39:53,134 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 13:42:59,349 - training.ctc_validation - INFO - Validation Results: Loss=3.7691, CER=0.0768, WER=0.2208
+2025-05-11 13:42:59,349 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 13:42:59,350 - CtcTrainer - INFO - --- Epoch 24/25 Summary ---
+2025-05-11 13:42:59,350 - CtcTrainer - INFO - Avg Train Loss: 0.6521
+2025-05-11 13:42:59,350 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 3.7690986165103735, 'val_cer': 0.07684999244240029, 'val_wer': 0.22078944568571124}
+2025-05-11 13:42:59,350 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0775
+2025-05-11 13:42:59,350 - CtcTrainer - INFO - ---------------------
+2025-05-11 13:42:59,351 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 13:43:00,565 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 13:43:00,566 - CtcTrainer - INFO - Saving best checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_best.pt...
+2025-05-11 13:43:01,696 - CtcTrainer - INFO - Best checkpoint saved successfully.
+2025-05-11 13:43:01,696 - CtcTrainer - INFO - New best metric (val_cer) at epoch 24: 0.0768
+2025-05-11 13:43:01,698 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 13:43:01,698 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 13:43:01,698 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 13:43:02,161 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 13:43:02,161 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=0, patience=10
+2025-05-11 13:43:02,391 - CtcTrainer - INFO - Starting Epoch 25/25
+2025-05-11 14:01:41,511 - data.ctc_ocr_dataset - WARNING - Sample 158065 resulted in empty label indices for text: ''. Skipping.
+2025-05-11 14:21:01,336 - CtcTrainer - INFO - Running end-of-epoch 25 validation...
+2025-05-11 14:21:01,753 - training.ctc_validation - INFO - --- Validation Sample 0 ---
+2025-05-11 14:21:01,753 - training.ctc_validation - INFO -   Ground Truth: 'â'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Prediction  : 'â'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - --- Validation Sample 1 ---
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Ground Truth: 'ruột'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Prediction  : 'suột'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - --- Validation Sample 2 ---
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Ground Truth: 'hvor Gud ikke boer i Hjerter og i Huset, der er der evig'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Prediction  : 'hovor Gund ike boer i Hjerter og i Heset, der ar dar eveg'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - --- Validation Sample 3 ---
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Ground Truth: 'gian'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Prediction  : 'gian'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - --- Validation Sample 4 ---
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Ground Truth: 'đinh'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO -   Prediction  : 'định'
+2025-05-11 14:21:01,754 - training.ctc_validation - INFO - ---------------------------------
+2025-05-11 14:24:07,698 - training.ctc_validation - INFO - Validation Results: Loss=3.7668, CER=0.0769, WER=0.2213
+2025-05-11 14:24:07,698 - training.ctc_validation - INFO - (Based on 32451 samples)
+2025-05-11 14:24:07,699 - CtcTrainer - INFO - --- Epoch 25/25 Summary ---
+2025-05-11 14:24:07,699 - CtcTrainer - INFO - Avg Train Loss: 0.6512
+2025-05-11 14:24:07,699 - CtcTrainer - INFO - Validation Metrics: {'val_loss': 3.7667505824434744, 'val_cer': 0.07694836120048272, 'val_wer': 0.2212788594531333}
+2025-05-11 14:24:07,699 - CtcTrainer - INFO - Best Val Metric (val_cer) So Far: 0.0768
+2025-05-11 14:24:07,699 - CtcTrainer - INFO - ---------------------
+2025-05-11 14:24:07,700 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 14:24:08,920 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 14:24:08,921 - CtcTrainer - INFO - Early Stopping Check: no_improvement_count=1, patience=10
+2025-05-11 14:24:09,137 - CtcTrainer - INFO - Training loop ended. Last epoch: 24. Steps: 456350
+2025-05-11 14:24:09,137 - CtcTrainer - INFO - Attempting to save final state...
+2025-05-11 14:24:09,138 - CtcTrainer - INFO - Saving latest checkpoint to outputs/dynamic_fusion_large/checkpoints/checkpoint_latest.pt...
+2025-05-11 14:24:10,413 - CtcTrainer - INFO - Latest checkpoint saved successfully.
+2025-05-11 14:24:10,413 - CtcTrainer - INFO - Training completed normally.
+2025-05-11 14:24:10,413 - CtcTrainer - INFO - Restoring best model weights...
+2025-05-11 14:24:10,417 - model.hierarchical_ctc_model - INFO - Saving HierarchicalCtcMultiScaleOcrModel model to: outputs/dynamic_fusion_large/final_model_hf
+2025-05-11 14:24:10,417 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 14:24:10,417 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 14:24:10,782 - model.hierarchical_ctc_model - INFO - Model components saved.
+2025-05-11 14:24:10,782 - CtcTrainer - INFO - Saved final model (best weights) to outputs/dynamic_fusion_large/final_model_hf
+2025-05-11 14:24:10,885 - TrainHierarchicalMultiScaleScript - INFO - ============ Training finished ============
+2025-05-11 14:24:10,885 - TrainHierarchicalMultiScaleScript - INFO - Final model artifacts saved in outputs/dynamic_fusion_large
+2025-05-11 14:24:10,885 - TrainHierarchicalMultiScaleScript - INFO - ============ Starting Final Evaluation on Test Set ============
+2025-05-11 14:24:11,134 - EvaluateHierarchicalCtcScript - INFO - Using device: cuda
+2025-05-11 14:24:11,134 - EvaluateHierarchicalCtcScript - INFO - Loading combined char vocab from: outputs/dynamic_fusion_large/combined_char_vocab.json
+2025-05-11 14:24:11,134 - EvaluateHierarchicalCtcScript - INFO - Combined vocab loaded: 229 chars.
+2025-05-11 14:24:11,134 - EvaluateHierarchicalCtcScript - INFO - Loading trained Hierarchical CTC model from: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 14:24:11,134 - model.hierarchical_ctc_model - INFO - Loading HierarchicalCtcMultiScaleOcrModel from: outputs/dynamic_fusion_large/best_model_hf
+2025-05-11 14:24:11,134 - model.hierarchical_ctc_model - WARNING - Combined character vocabulary is empty during config init.
+2025-05-11 14:24:11,135 - model.hierarchical_ctc_model - INFO - Loading config from: outputs/dynamic_fusion_large/best_model_hf/config.json
+2025-05-11 14:24:11,135 - model.hierarchical_ctc_model - INFO - Initializing HierarchicalCtcMultiScaleOcrModel...
+2025-05-11 14:24:15,502 - model.hierarchical_ctc_model - INFO - Processor and Vision Encoder loaded.
+
