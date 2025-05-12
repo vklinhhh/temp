@@ -70,47 +70,65 @@ class VisualDiacriticAttention(nn.Module):
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
     
-    def forward(self, features):
-        """
-        Apply visual diacritic attention to input features.
+    # def forward(self, features):
+    #     """
+    #     Apply visual diacritic attention to input features.
         
-        Args:
-            features: Tensor of shape [batch_size, seq_length, feature_dim]
-                    Typically the output of shared feature layers
+    #     Args:
+    #         features: Tensor of shape [batch_size, seq_length, feature_dim]
+    #                 Typically the output of shared feature layers
         
-        Returns:
-            diacritic_logits: Tensor of shape [batch_size, seq_length, diacritic_vocab_size]
-        """
-        batch_size, seq_length, _ = features.shape
+    #     Returns:
+    #         diacritic_logits: Tensor of shape [batch_size, seq_length, diacritic_vocab_size]
+    #     """
+    #     batch_size, seq_length, _ = features.shape
         
-        # Generate position attention weights
-        # [batch_size, seq_length, 3]
-        position_logits = self.position_encoder(features)
-        position_weights = F.softmax(position_logits, dim=-1)
+    #     # Generate position attention weights
+    #     # [batch_size, seq_length, 3]
+    #     position_logits = self.position_encoder(features)
+    #     position_weights = F.softmax(position_logits, dim=-1)
         
-        # Apply each specialized classifier to all positions
-        region_logits = []
-        for i, classifier in enumerate(self.region_classifiers):
-            # [batch_size, seq_length, diacritic_vocab_size]
-            region_output = classifier(features)
+    #     # Apply each specialized classifier to all positions
+    #     region_logits = []
+    #     for i, classifier in enumerate(self.region_classifiers):
+    #         # [batch_size, seq_length, diacritic_vocab_size]
+    #         region_output = classifier(features)
             
-            # Weight by position attention
-            # [batch_size, seq_length, 1] * [batch_size, seq_length, diacritic_vocab_size]
-            weighted_output = position_weights[:, :, i:i+1] * region_output
-            region_logits.append(weighted_output)
+    #         # Weight by position attention
+    #         # [batch_size, seq_length, 1] * [batch_size, seq_length, diacritic_vocab_size]
+    #         weighted_output = position_weights[:, :, i:i+1] * region_output
+    #         region_logits.append(weighted_output)
         
-        # Option 1: Sum the weighted outputs from different regions
-        # diacritic_logits = sum(region_logits)
+    #     # Option 1: Sum the weighted outputs from different regions
+    #     # diacritic_logits = sum(region_logits)
         
-        # Option 2: Concatenate and fuse with a linear layer (more expressive)
-        # [batch_size, seq_length, diacritic_vocab_size*3]
-        concatenated_logits = torch.cat(region_logits, dim=-1)
-        # [batch_size, seq_length, diacritic_vocab_size]
-        diacritic_logits = self.output_fusion(concatenated_logits)
+    #     # Option 2: Concatenate and fuse with a linear layer (more expressive)
+    #     # [batch_size, seq_length, diacritic_vocab_size*3]
+    #     concatenated_logits = torch.cat(region_logits, dim=-1)
+    #     # [batch_size, seq_length, diacritic_vocab_size]
+    #     diacritic_logits = self.output_fusion(concatenated_logits)
         
-        return diacritic_logits
-
-
+    #     return diacritic_logits
+    def forward(self, features, return_attention_weights=False): # Added return_attention_weights
+            batch_size, seq_length, _ = features.shape
+            
+            position_logits = self.position_encoder(features)
+            # position_weights are [batch_size, seq_length, 3] (for above, middle, below)
+            position_weights = F.softmax(position_logits, dim=-1) 
+            
+            region_logits_list = [] # Renamed from region_logits to avoid confusion
+            for i, classifier in enumerate(self.region_classifiers):
+                region_output = classifier(features)
+                weighted_output = position_weights[:, :, i:i+1] * region_output
+                region_logits_list.append(weighted_output)
+            
+            concatenated_logits = torch.cat(region_logits_list, dim=-1)
+            final_diacritic_logits = self.output_fusion(concatenated_logits)
+            
+            if return_attention_weights:
+                return final_diacritic_logits, position_weights
+            return final_diacritic_logits
+    
 class CharacterDiacriticCompatibility(nn.Module):
     """
     Explicit Character-Diacritic Compatibility Matrix.

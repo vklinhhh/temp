@@ -1,47 +1,47 @@
 # data/ctc_collation.py
 import torch
+import logging
 
+logger = logging.getLogger(__name__)
 def ctc_collate_fn(batch):
-    """
-    Collate function for CTC OCR task.
-    Handles filtering None, stacking images, padding labels,
-    and creating label_lengths tensor.
-    Input lengths (for log_probs) are NOT created here, must be calculated
-    after the model's encoder/RNN forward pass based on its output shape.
-    """
-    # Filter out samples that failed during dataset processing
     batch = [item for item in batch if item is not None]
     if not batch: return None
 
-    # Stack pixel values
     try:
         pixel_values = torch.stack([item['pixel_values'] for item in batch])
     except Exception as e:
-        print(f"Error stacking pixel_values: {e}.")
+        logger.error(f"Error stacking pixel_values: {e}.")
         shapes = [item['pixel_values'].shape for item in batch]
-        print(f"Pixel value shapes in failing batch: {shapes}")
-        return None # Let DataLoader handle None batch
+        logger.error(f"Pixel value shapes in failing batch: {shapes}")
+        # It's better to raise an error or return None to be handled by DataLoader's error handling
+        # Forcing a skip here might hide issues. If a batch *must* be returned, it needs to be valid.
+        return None 
 
-    # Pad labels (target character indices)
     labels = [item['labels'] for item in batch]
-    # Get length of each label BEFORE padding
     label_lengths = torch.tensor([len(lab) for lab in labels], dtype=torch.long)
-
-    # Pad labels - Use 0 (blank index) or another specific pad index if defined.
-    # CTC loss often uses blank=0, so padding with 0 might be okay IF blank is handled correctly,
-    # but using a dedicated pad index might be safer if vocab includes 0 for a real char.
-    # Let's assume blank=0 and we pad with 0. The label_lengths tensor tells CTC loss the real length.
     padded_labels = torch.nn.utils.rnn.pad_sequence(
-        labels, batch_first=True, padding_value=0 # Pad with blank index
+        labels, batch_first=True, padding_value=0
     )
-
-    # Keep original text if available
     texts = [item.get('text', '') for item in batch]
 
-
-    return {
+    collated_batch = {
         'pixel_values': pixel_values,
         'labels': padded_labels,
-        'label_lengths': label_lengths, # Crucial for CTC loss
-        'texts': texts # Optional: for validation/debugging
+        'label_lengths': label_lengths,
+        'texts': texts
     }
+    
+    # Collect original images if present (typically for non-training mode)
+    # Ensure all items in 'batch' are checked for 'original_image_pil'
+    # and that the list corresponds to the filtered batch.
+    if 'original_image_pil' in batch[0]: # Check if the key exists in the first valid item
+        original_images_pil = [item.get('original_image_pil') for item in batch]
+        # Filter out None if some items didn't have it (though logic above tries to ensure they do for eval)
+        # For simplicity, we assume if one has it, all (valid) items in the batch should have it for eval.
+        if all(img is not None for img in original_images_pil):
+             collated_batch['original_images_pil'] = original_images_pil
+        else:
+            logger.warning("Not all items in the batch had 'original_image_pil'. It will not be added to the collated batch.")
+
+
+    return collated_batch
