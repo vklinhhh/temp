@@ -1,64 +1,161 @@
-# Hierarchical CTC OCR Model
+# Vietnamese OCR with Hierarchical CTC and Dynamic Feature Enhancement
 
-This project implements an OCR model for Vietnamese text using a Hierarchical CTC approach. The goal is to improve character and diacritic recognition by structuring the prediction heads hierarchically while still using a standard CTC loss on a combined character vocabulary.
+A specialized OCR model designed for Vietnamese text recognition, with advanced components for handling the complex diacritical mark system used in Vietnamese writing.
 
-## Architecture
+## Key Features
 
-*   **Vision Encoder:** Extracts frame-level visual features.
-*   **Intermediate RNN:** Processes the visual sequence.
-*   **Shared Feature Layer:** A common layer processing RNN output before branching.
-*   **Hierarchical Heads:**
-    *   **Base Head:** Predicts base character probabilities from shared features.
-    *   **Conditioning:** Uses shared features and potentially base predictions to create conditioned features for the diacritic head (e.g., via concatenation or gating).
-    *   **Diacritic Head:** Predicts diacritic probabilities from conditioned features.
-*   **Final Classifier Head:** Takes features derived from the hierarchical structure (e.g., the shared features, or a combination of features/logits from branches) and predicts probabilities over a **combined character vocabulary** (e.g., 'a', 'á', 'à', 'â', 'b', ...).
-*   **CTC Loss:** Trained using standard CTC loss on the output of the final combined classifier head against ground truth labels composed of combined character indices.
+- **Hierarchical Multi-Stage Architecture**: Specialized components for base characters and diacritical marks
+- **Dynamic Multi-Scale Fusion**: Adaptively combines features from different vision encoder layers
+- **Local Feature Enhancer**: Targeted enhancement for diacritical mark detection
+- **Three-Head Classification System**: Separate classification paths for base characters, diacritics, and combined characters
 
-## Purpose
+## Architecture Overview
 
-This architecture attempts to leverage the linguistic structure (Diacritic depends on Base) *internally* by conditioning the diacritic prediction path on the base prediction path (or related features). By training end-to-end with a CTC loss on the final combined characters, it avoids the composition and alignment issues of the Dual CTC approach during inference, while still encouraging the internal layers to learn the base-diacritic relationship.
+The architecture consists of several specialized components designed to handle the complexity of Vietnamese text recognition:
 
-## Key Differences from Dual CTC
+### Core Components
 
-*   **Single Final Output/Loss:** Uses one final classifier head predicting combined characters and a single CTC loss, simplifying training and inference decoding.
-*   **Internal Hierarchy:** Explicitly structures the layers *before* the final classifier to model the base-diacritic dependency (e.g., via conditioning).
-*   **No Post-Composition:** Inference uses standard CTC decoding on the combined character output, eliminating the need for a separate composition step.
+1. **Vision Encoder**: Extracts multi-scale visual features from input images using a pre-trained vision encoder (based on TrOCR/ViT)
+
+2. **Dynamic Multi-Scale Fusion**:
+   - Adaptively combines features from different encoder layers
+   - Uses global content analysis to determine importance weights for each layer
+   - Employs position-specific gating for fine-grained feature selection
+   - Balances global character recognition with local detail preservation
+
+3. **Local Feature Enhancer**:
+   - Specialized in enhancing diacritical mark features
+   - Uses region-specific attention (above/middle/below character regions)
+   - Contains diacritic prototypes for improved recognition
+   - Makes subtle diacritical marks more prominent in the feature representation
+
+4. **Transformer Encoder**:
+   - Processes enhanced features through multiple transformer layers
+   - Captures sequential dependencies in text
+
+5. **Hierarchical Classification Heads**:
+   - **Base Character Classifier**: Recognizes the fundamental character (e.g., 'a', 'e', 'o')
+   - **Diacritic Classifier**: Identifies the diacritical mark (e.g., 'acute', 'grave', 'hook')
+   - **Combined Character Classifier**: Predicts the full combined character (e.g., 'á', 'à', 'ả')
+
+6. **CTC Loss**: Enables alignment-free sequence prediction using Connectionist Temporal Classification
+
+### Key Innovations
+
+- **Diacritic-Aware Feature Processing**: Components specifically designed for Vietnamese diacritics
+- **Adaptive Multi-Scale Feature Integration**: Dynamically adjusts feature importance based on content
+- **Hierarchical Classification Approach**: Decomposes the recognition problem into simpler sub-tasks
+
+## Model Performance
+
+The model demonstrates strong performance on Vietnamese OCR tasks, with particular strengths in:
+
+- Accurate recognition of complex diacritical marks
+- Handling of visually similar characters with different diacritics
+- Robust performance across various fonts and writing styles
+
+Character Error Rate (CER) and Word Error Rate (WER) metrics show significant improvements over baseline models, especially for text with multiple diacritical marks.
+
+## Visualization Tools
+
+The repository includes tools for visualizing model attention and feature importance:
+
+- **Grad-CAM Visualization**: Shows which parts of the image the model focuses on for specific predictions
+- **Attention Visualization**: Displays the region-specific attention maps for diacritical mark detection
+- **Evaluation Reports**: Generates comprehensive HTML reports of model performance with visualizations
+
+## Usage Examples
+
+### Training
+
+```python
+python scripts/train_hierarchical_ctc.py \
+    --dataset_name vklinhhh/vietnamese_character_diacritic_cwl_v2 \
+    --vision_encoder microsoft/trocr-base-handwritten \
+    --output_dir outputs/dynamic_fusion_large \
+    --fusion_layers "-1,-4" \
+    --use_dynamic_fusion \
+    --use_feature_enhancer \
+    --batch_size 16 \
+    --learning_rate 1e-4 \
+    --epochs 30 \
+    --wandb_project vietnam-ocr
+```
+
+### Evaluation
+
+```python
+python scripts/evaluate_hierarchical_ctc.py \
+    --model_path outputs/dynamic_fusion_large/best_model_hf \
+    --combined_char_vocab_path outputs/dynamic_fusion_large/combined_char_vocab.json \
+    --dataset_name vklinhhh/test_vietnamese_cwl \
+    --output_dir evaluation_results
+```
+
+### Visualization
+
+```python
+python scripts/visualize_all_layers_grad_cam.py \
+    --model_path outputs/dynamic_fusion_large/best_model_hf \
+    --combined_char_vocab_path outputs/dynamic_fusion_large/combined_char_vocab.json \
+    --image_path path/to/image.jpg \
+    --output_path_prefix visualizations/output \
+    --grad_cam_target_diacritic acute
+```
+
+## Requirements
+
+- Python 3.8+
+- PyTorch 1.10+
+- Transformers 4.20+
+- albumentations
+- editdistance
+- cv2
+- wandb (optional, for logging)
 
 ## Project Structure
 
-(Similar structure to `ctc_ocr` and `dual_ctc_ocr`, with model/scripts renamed)
+```
+├── data/              # Dataset handling
+│   ├── ctc_collation.py
+│   ├── ctc_ocr_dataset.py
+│   └── __init__.py
+├── model/             # Model architecture
+│   ├── diacritic_attention.py
+│   ├── dynamic_fusion.py
+│   ├── hierarchical_ctc_model.py
+│   └── __init__.py
+├── training/          # Training and validation
+│   ├── ctc_trainer.py
+│   ├── ctc_validation.py
+│   └── __init__.py
+├── utils/             # Utility functions
+│   ├── ctc_utils.py
+│   ├── evaluation_reporter.py
+│   ├── optimizers.py
+│   ├── schedulers.py
+│   └── __init__.py
+├── scripts/           # Training and evaluation scripts
+│   ├── train_hierarchical_ctc.py
+│   ├── evaluate_hierarchical_ctc.py
+│   ├── visualize_single_image.py
+│   └── visualize_all_layers_grad_cam.py
+```
 
-```bash
-./hierarchical_ctc_ocr/
-├── model/
-│   ├── __init__.py
-│   └── hierarchical_ctc_model.py # Hierarchical model definition
-├── data/
-│   ├── __init__.py
-│   ├── ctc_ocr_dataset.py      # Reused: Expects combined char labels
-│   └── ctc_collation.py        # Reused: Standard CTC collation
-├── training/
-│   ├── __init__.py
-│   ├── ctc_trainer.py          # Reused: Standard CTC trainer
-│   └── ctc_validation.py       # Reused: Standard CTC validation
-├── utils/
-│   ├── __init__.py
-│   ├── optimizers.py           # Reused
-│   ├── schedulers.py           # Reused
-│   └── ctc_utils.py            # Reused (needs combined vocab builder)
-├── scripts/
-│   ├── __init__.py
-│   ├── train_hierarchical_ctc.py # Main training script
-│   └── evaluate_hierarchical_ctc.py# Evaluation script
-├── outputs/
-│   └── hierarchical_ctc_ocr_model/
-├── logs/
-│   └── main_training_hierarchical.log
-├── README_hierarchical.md      # This file
-└── requirements_hierarchical.txt # Dependencies
+## Citation
 
+If you use this work in your research, please cite:
 
+```
+@article{vietnamese-hierarchical-ctc,
+  title={Vietnamese OCR with Hierarchical CTC and Dynamic Feature Enhancement},
+  author={Your Name},
+  journal={arXiv preprint},
+  year={2025}
+}
+```
 
-```bash
-python -m scripts.train_hierarchical_ctc   --dataset_name vklinhhh/vnhwt_opt_1    --output_dir outputs/dynamic_fusion_large  --use_dynamic_fusion   --use_feature_enhancer   --transformer_d_model 768   --transformer_nhead 12   --num_transformer_layers 6   --shared_hidden_size 768   --batch_size 16   --learning_rate 5e-5   --discriminative_lr   --encoder_lr_factor 0.1   --warmup_ratio 0.05   --weight_decay 0.02   --epochs 25   --use_visual_diacritic_attention   --use_character_diacritic_compatibility   --use_few_shot_diacritic_adapter   --num_few_shot_prototypes 10   --use_amp   --fusion_method concat_proj
+## Acknowledgments
 
+- This project builds upon the TrOCR architecture from Microsoft
+- Special thanks to the contributors of the Vietnamese Character Dataset
