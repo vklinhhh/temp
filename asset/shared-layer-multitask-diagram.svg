@@ -1,0 +1,178 @@
+<svg viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#f8f9fa" rx="10" ry="10"/>
+  <text x="600" y="50" font-family="Arial" font-size="28" text-anchor="middle" font-weight="bold">Shared Layer and Multi-Task Classification Heads</text>
+  
+  <!-- Input Features -->
+  <rect x="475" y="100" width="250" height="70" fill="#e3f2fd" stroke="#1565c0" stroke-width="2" rx="5" ry="5"/>
+  <text x="600" y="130" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Transformer Encoder Features F_trans</text>
+  <text x="600" y="155" font-family="Arial" font-size="12" text-anchor="middle">Enhanced feature sequence: B×L×D_trans tensor</text>
+  
+  <!-- Shared Layer -->
+  <rect x="450" y="200" width="300" height="100" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2" rx="5" ry="5"/>
+  <text x="600" y="230" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Shared Feature Layer</text>
+  <text x="600" y="255" font-family="Arial" font-size="12" text-anchor="middle">F_shared = Dropout(GELU(LN(W·F_trans + b)))</text>
+  <text x="600" y="275" font-family="Arial" font-size="12" text-anchor="middle">Creates common representation for all tasks</text>
+  <text x="600" y="295" font-family="Arial" font-size="12" text-anchor="middle">B×L×D_shared tensor</text>
+  
+  <!-- Classification Heads -->
+  <!-- Base Character -->
+  <rect x="150" y="350" width="250" height="100" fill="#fff8e1" stroke="#ff8f00" stroke-width="2" rx="5" ry="5"/>
+  <text x="275" y="380" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Base Character Classifier</text>
+  <text x="275" y="405" font-family="Arial" font-size="12" text-anchor="middle">Z_base = W_base·F_shared + b_base</text>
+  <text x="275" y="425" font-family="Arial" font-size="12" text-anchor="middle">P_base = Softmax(Z_base)</text>
+  <text x="275" y="445" font-family="Arial" font-size="12" text-anchor="middle">Classifies into base characters (a, e, o, etc.)</text>
+  
+  <!-- Conditioning -->
+  <rect x="450" y="375" width="300" height="150" fill="#f3e5f5" stroke="#6a1b9a" stroke-width="2" rx="5" ry="5"/>
+  <text x="600" y="400" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Conditioning Mechanism</text>
+  <text x="600" y="425" font-family="Arial" font-size="12" text-anchor="middle">Option 1 (concat_proj):</text>
+  <text x="600" y="445" font-family="Arial" font-size="12" text-anchor="middle">F_cond = GELU(LN(W_cond·[F_shared; P_base] + b_cond))</text>
+  <text x="600" y="470" font-family="Arial" font-size="12" text-anchor="middle">Option 2 (gate):</text>
+  <text x="600" y="490" font-family="Arial" font-size="12" text-anchor="middle">G = σ(W_g·[F_shared; P_base] + b_g)</text>
+  <text x="600" y="510" font-family="Arial" font-size="12" text-anchor="middle">F_cond = G ⊙ F_shared</text>
+  
+  <!-- Diacritic -->
+  <rect x="475" y="575" width="250" height="100" fill="#ffcdd2" stroke="#c62828" stroke-width="2" rx="5" ry="5"/>
+  <text x="600" y="605" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Diacritic Classifier</text>
+  <text x="600" y="630" font-family="Arial" font-size="12" text-anchor="middle">Z_diac = W_diac·F_cond + b_diac</text>
+  <text x="600" y="650" font-family="Arial" font-size="12" text-anchor="middle">P_diac = Softmax(Z_diac)</text>
+  <text x="600" y="670" font-family="Arial" font-size="12" text-anchor="middle">Classifies diacritics (acute, grave, etc.)</text>
+  
+  <!-- Combined -->
+  <rect x="800" y="350" width="250" height="100" fill="#e0f7fa" stroke="#006064" stroke-width="2" rx="5" ry="5"/>
+  <text x="925" y="380" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Combined Character Classifier</text>
+  <text x="925" y="405" font-family="Arial" font-size="12" text-anchor="middle">Z_comb = W_comb·F_shared + b_comb</text>
+  <text x="925" y="425" font-family="Arial" font-size="12" text-anchor="middle">P_comb = Softmax(Z_comb)</text>
+  <text x="925" y="445" font-family="Arial" font-size="12" text-anchor="middle">Classifies full characters (á, à, etc.)</text>
+  
+  <!-- Loss Calculation -->
+  <rect x="450" y="725" width="300" height="125" fill="#ede7f6" stroke="#4527a0" stroke-width="2" rx="5" ry="5"/>
+  <text x="600" y="750" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Multi-Task Loss Calculation</text>
+  <text x="600" y="775" font-family="Arial" font-size="12" text-anchor="middle">L_CTC = CTCLoss(Z_comb, y_comb)</text>
+  <text x="600" y="795" font-family="Arial" font-size="12" text-anchor="middle">L_base = CrossEntropy(Z_base, y_base)</text>
+  <text x="600" y="815" font-family="Arial" font-size="12" text-anchor="middle">L_diac = CrossEntropy(Z_diac, y_diac)</text>
+  <text x="600" y="835" font-family="Arial" font-size="12" text-anchor="middle">L_total = L_CTC + λ_base·L_base + λ_diac·L_diac</text>
+  
+  <!-- Vietnamese Character Example: "á" -->
+  <!-- Left side: Character visualization -->
+  <rect x="50" y="350" width="70" height="325" fill="white" stroke="#757575" stroke-width="2" rx="5" ry="5"/>
+  <text x="85" y="375" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">Example:</text>
+  <text x="85" y="410" font-family="Arial" font-size="42" text-anchor="middle">á</text>
+  
+  <!-- Right side: Classification outputs -->
+  <rect x="950" y="500" width="200" height="275" fill="white" stroke="#757575" stroke-width="2" rx="5" ry="5"/>
+  <text x="1050" y="525" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">Classification Results</text>
+  
+  <text x="960" y="550" font-family="Arial" font-size="12" text-anchor="start" font-weight="bold">Base Character:</text>
+  <text x="970" y="570" font-family="Arial" font-size="11" text-anchor="start">'a': 0.95</text>
+  <text x="970" y="590" font-family="Arial" font-size="11" text-anchor="start">'e': 0.03</text>
+  <text x="970" y="610" font-family="Arial" font-size="11" text-anchor="start">'o': 0.01</text>
+  <text x="970" y="630" font-family="Arial" font-size="11" text-anchor="start">others: 0.01</text>
+  
+  <text x="960" y="655" font-family="Arial" font-size="12" text-anchor="start" font-weight="bold">Diacritic:</text>
+  <text x="970" y="675" font-family="Arial" font-size="11" text-anchor="start">'acute': 0.92</text>
+  <text x="970" y="695" font-family="Arial" font-size="11" text-anchor="start">'grave': 0.04</text>
+  <text x="970" y="715" font-family="Arial" font-size="11" text-anchor="start">'hook': 0.02</text>
+  <text x="970" y="735" font-family="Arial" font-size="11" text-anchor="start">others: 0.02</text>
+  
+  <text x="960" y="760" font-family="Arial" font-size="12" text-anchor="start" font-weight="bold">Combined Char:</text>
+  <text x="970" y="780" font-family="Arial" font-size="11" text-anchor="start">'á': 0.91</text>
+  <text x="970" y="800" font-family="Arial" font-size="11" text-anchor="start">'à': 0.05</text>
+  <text x="970" y="820" font-family="Arial" font-size="11" text-anchor="start">'ả': 0.02</text>
+  <text x="970" y="840" font-family="Arial" font-size="11" text-anchor="start">others: 0.02</text>
+  
+  <!-- Advantages Box -->
+  <rect x="50" y="700" width="350" height="150" fill="white" stroke="#757575" stroke-width="2" rx="5" ry="5"/>
+  <text x="225" y="725" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Advantages of Multi-Task Heads</text>
+  
+  <text x="70" y="750" font-family="Arial" font-size="12" text-anchor="start">1. Task Decomposition: Breaking down complex</text>
+  <text x="80" y="765" font-family="Arial" font-size="12" text-anchor="start">   character recognition into simpler subtasks</text>
+  
+  <text x="70" y="785" font-family="Arial" font-size="12" text-anchor="start">2. Knowledge Sharing: Learning diacritics on one</text>
+  <text x="80" y="800" font-family="Arial" font-size="12" text-anchor="start">   vowel helps recognize them on others</text>
+  
+  <text x="70" y="820" font-family="Arial" font-size="12" text-anchor="start">3. Multi-Signal Regularization: Multiple loss</text>
+  <text x="80" y="835" font-family="Arial" font-size="12" text-anchor="start">   signals prevent overfitting to any single aspect</text>
+  
+  <!-- Flow Diagrams -->
+  <!-- Base Diagram: Shows how each component works for specific inputs -->
+  <rect x="50" y="500" width="70" height="180" fill="#fff8e1" fill-opacity="0.3" stroke="#ff8f00" stroke-width="1" rx="5" ry="5"/>
+  <text x="85" y="515" font-family="Arial" font-size="8" text-anchor="middle">Base Classifier</text>
+  <text x="85" y="530" font-family="Arial" font-size="8" text-anchor="middle">Focus:</text>
+  <text x="85" y="540" font-family="Arial" font-size="8" text-anchor="middle">Circular</text>
+  <text x="85" y="550" font-family="Arial" font-size="8" text-anchor="middle">shape of 'a'</text>
+  <text x="85" y="565" font-family="Arial" font-size="8" text-anchor="middle">Ignores</text>
+  <text x="85" y="575" font-family="Arial" font-size="8" text-anchor="middle">diacritic</text>
+  
+  <rect x="50" y="575" width="70" height="105" fill="#ffcdd2" fill-opacity="0.3" stroke="#c62828" stroke-width="1" rx="5" ry="5"/>
+  <text x="85" y="590" font-family="Arial" font-size="8" text-anchor="middle">Diacritic</text>
+  <text x="85" y="600" font-family="Arial" font-size="8" text-anchor="middle">Classifier</text>
+  <text x="85" y="615" font-family="Arial" font-size="8" text-anchor="middle">Focus:</text>
+  <text x="85" y="625" font-family="Arial" font-size="8" text-anchor="middle">Acute accent</text>
+  <text x="85" y="635" font-family="Arial" font-size="8" text-anchor="middle">diagonal stroke</text>
+  <text x="85" y="650" font-family="Arial" font-size="8" text-anchor="middle">Conditioned</text>
+  <text x="85" y="660" font-family="Arial" font-size="8" text-anchor="middle">on base 'a'</text>
+  
+  <!-- Information Exchange Box -->
+  <rect x="800" y="175" width="350" height="130" fill="white" stroke="#757575" stroke-width="2" rx="5" ry="5"/>
+  <text x="975" y="200" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">How The Heads Support Each Other</text>
+  
+  <text x="820" y="225" font-family="Arial" font-size="12" text-anchor="start">1. Base → Diacritic: Explicit conditioning provides</text>
+  <text x="830" y="240" font-family="Arial" font-size="12" text-anchor="start">   context about which diacritics are valid for 'a'</text>
+  
+  <text x="820" y="260" font-family="Arial" font-size="12" text-anchor="start">2. All → Shared: Gradients from all tasks jointly</text>
+  <text x="830" y="275" font-family="Arial" font-size="12" text-anchor="start">   optimize the shared representation</text>
+  
+  <text x="820" y="295" font-family="Arial" font-size="12" text-anchor="start">3. Complementary Specialization: Each head</text>
+  <text x="830" y="310" font-family="Arial" font-size="12" text-anchor="start">   becomes expert at one aspect of recognition</text>
+  
+  <!-- Connections -->
+  <!-- From input to shared layer -->
+  <path d="M600 170 L600 200" fill="none" stroke="#1565c0" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From shared layer to classifiers -->
+  <path d="M500 300 L350 300 Q275 300 275 350" fill="none" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M600 300 L600 375" fill="none" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M700 300 L850 300 Q925 300 925 350" fill="none" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From base to conditioning -->
+  <path d="M350 400 L450 400" fill="none" stroke="#ff8f00" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <text x="400" y="385" font-family="Arial" font-size="10" text-anchor="middle">Conditions</text>
+  
+  <!-- From conditioning to diacritic -->
+  <path d="M600 525 L600 575" fill="none" stroke="#6a1b9a" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From classifiers to loss -->
+  <path d="M275 450 L275 750 Q275 760 285 760 H450" fill="none" stroke="#ff8f00" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M600 675 L600 725" fill="none" stroke="#c62828" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M925 450 L925 770 Q925 780 915 780 H750" fill="none" stroke="#006064" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Gradient Flow -->
+  <path d="M600 725 L600 705 Q600 695 600 685 L600 675" fill="none" stroke="#4527a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowheadGrad)"/>
+  <path d="M450 780 L430 780 Q410 780 400 770 Q390 760 380 750 Q370 740 360 730 Q350 720 340 710 Q330 700 320 690 Q310 680 300 670 Q290 660 280 650 Q270 640 275 630 Q280 620 285 610 Q290 600 275 590 Q260 580 275 570 Q290 560 275 550 Q260 540 265 530 Q270 520 275 510 Q280 500 275 490 Q270 480 275 470 Q280 460 275 450" fill="none" stroke="#4527a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowheadGrad)"/>
+  <path d="M750 780 L770 780 Q790 780 800 770 Q810 760 820 750 Q830 740 840 730 Q850 720 860 710 Q870 700 880 690 Q890 680 900 670 Q910 660 920 650 Q930 640 925 630 Q920 620 915 610 Q910 600 925 590 Q940 580 925 570 Q910 560 925 550 Q940 540 935 530 Q930 520 925 510 Q920 500 925 490 Q930 480 925 470 Q920 460 925 450" fill="none" stroke="#4527a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowheadGrad)"/>
+  
+  <!-- Backward gradient flow to shared layer -->
+  <path d="M275 450 L275 330 Q275 320 285 320 H450" fill="none" stroke="#4527a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowheadGrad)"/>
+  <path d="M600 375 L600 330 Q600 320 600 310 L600 300" fill="none" stroke="#4527a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowheadGrad)"/>
+  <path d="M925 450 L925 330 Q925 320 915 320 H750" fill="none" stroke="#4527a0" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowheadGrad)"/>
+  
+  <!-- Multi-Task Training Box -->
+  <rect x="800" y="600" width="130" height="100" fill="#e1f5fe" stroke="#0288d1" stroke-width="2" rx="5" ry="5"/>
+  <text x="865" y="625" font-family="Arial" font-size="12" text-anchor="middle" font-weight="bold">Multi-Task Training</text>
+  <text x="865" y="645" font-family="Arial" font-size="10" text-anchor="middle">Trains 3 classifiers</text>
+  <text x="865" y="660" font-family="Arial" font-size="10" text-anchor="middle">simultaneously</text>
+  <text x="865" y="675" font-family="Arial" font-size="10" text-anchor="middle">with weighted</text>
+  <text x="865" y="690" font-family="Arial" font-size="10" text-anchor="middle">loss function</text>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+    <marker id="arrowheadGrad" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4527a0"/>
+    </marker>
+  </defs>
+</svg>

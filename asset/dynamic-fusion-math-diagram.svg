@@ -1,0 +1,168 @@
+<svg viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#f8f9fa" rx="10" ry="10"/>
+  <text x="600" y="50" font-family="Arial" font-size="28" text-anchor="middle" font-weight="bold">Dynamic Multi-Scale Fusion: Mathematical Visualization</text>
+  
+  <!-- Input Feature Maps -->
+  <rect x="50" y="120" width="220" height="120" fill="#e3f2fd" stroke="#1565c0" stroke-width="2" rx="5" ry="5"/>
+  <text x="160" y="145" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Feature Map F¹ (Layer -1)</text>
+  <text x="160" y="170" font-family="Arial" font-size="14" text-anchor="middle">High-level features</text>
+  <text x="160" y="190" font-family="Arial" font-size="14" text-anchor="middle">Strong on base character</text>
+  <text x="160" y="210" font-family="Arial" font-size="14" text-anchor="middle">B×L×D tensor</text>
+  
+  <rect x="50" y="280" width="220" height="120" fill="#e3f2fd" stroke="#1565c0" stroke-width="2" rx="5" ry="5"/>
+  <text x="160" y="305" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Feature Map F² (Layer -4)</text>
+  <text x="160" y="330" font-family="Arial" font-size="14" text-anchor="middle">Fine-grained details</text>
+  <text x="160" y="350" font-family="Arial" font-size="14" text-anchor="middle">Strong on diacritics</text>
+  <text x="160" y="370" font-family="Arial" font-size="14" text-anchor="middle">B×L×D tensor</text>
+  
+  <!-- Mean Pooling Operations -->
+  <rect x="320" y="140" width="180" height="80" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2" rx="5" ry="5"/>
+  <text x="410" y="170" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Mean Pooling</text>
+  <text x="410" y="190" font-family="Arial" font-size="12" text-anchor="middle">G¹ = (1/L)∑F¹ₖ</text>
+  
+  <rect x="320" y="300" width="180" height="80" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2" rx="5" ry="5"/>
+  <text x="410" y="330" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Mean Pooling</text>
+  <text x="410" y="350" font-family="Arial" font-size="12" text-anchor="middle">G² = (1/L)∑F²ₖ</text>
+  
+  <!-- Global Feature Concatenation -->
+  <rect x="550" y="220" width="200" height="100" fill="#fff8e1" stroke="#ff8f00" stroke-width="2" rx="5" ry="5"/>
+  <text x="650" y="250" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Concatenate</text>
+  <text x="650" y="275" font-family="Arial" font-size="14" text-anchor="middle">G = [G¹; G²; ...; Gᴺ]</text>
+  <text x="650" y="300" font-family="Arial" font-size="12" text-anchor="middle">B×(N·D) tensor</text>
+  
+  <!-- Global Context Encoder -->
+  <rect x="800" y="220" width="250" height="100" fill="#f3e5f5" stroke="#6a1b9a" stroke-width="2" rx="5" ry="5"/>
+  <text x="925" y="250" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Global Context Encoder</text>
+  <text x="925" y="275" font-family="Arial" font-size="12" text-anchor="middle">W_g = Softmax(W₂(GELU(LN(W₁(G)))))</text>
+  <text x="925" y="300" font-family="Arial" font-size="12" text-anchor="middle">B×N tensor of layer weights</text>
+  
+  <!-- Position-Specific Gate Generators -->
+  <rect x="320" y="450" width="200" height="120" fill="#ffe0b2" stroke="#e65100" stroke-width="2" rx="5" ry="5"/>
+  <text x="420" y="470" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Gate Generator 1</text>
+  <text x="420" y="495" font-family="Arial" font-size="12" text-anchor="middle">S¹ = σ(W²₁(GELU(LN(W¹₁(F¹)))))</text>
+  <text x="420" y="520" font-family="Arial" font-size="14" text-anchor="middle">Position-specific gates</text>
+  <text x="420" y="545" font-family="Arial" font-size="12" text-anchor="middle">B×L×1 tensor</text>
+  
+  <rect x="320" y="600" width="200" height="120" fill="#ffe0b2" stroke="#e65100" stroke-width="2" rx="5" ry="5"/>
+  <text x="420" y="620" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Gate Generator 2</text>
+  <text x="420" y="645" font-family="Arial" font-size="12" text-anchor="middle">S² = σ(W²₂(GELU(LN(W¹₂(F²)))))</text>
+  <text x="420" y="670" font-family="Arial" font-size="14" text-anchor="middle">Position-specific gates</text>
+  <text x="420" y="695" font-family="Arial" font-size="12" text-anchor="middle">B×L×1 tensor</text>
+  
+  <!-- Global Weights Application -->
+  <rect x="600" y="450" width="200" height="80" fill="#e1f5fe" stroke="#0277bd" stroke-width="2" rx="5" ry="5"/>
+  <text x="700" y="475" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Apply Global Weights</text>
+  <text x="700" y="500" font-family="Arial" font-size="12" text-anchor="middle">F̂¹ = W¹_g · F¹</text>
+  
+  <rect x="600" y="600" width="200" height="80" fill="#e1f5fe" stroke="#0277bd" stroke-width="2" rx="5" ry="5"/>
+  <text x="700" y="625" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Apply Global Weights</text>
+  <text x="700" y="650" font-family="Arial" font-size="12" text-anchor="middle">F̂² = W²_g · F²</text>
+  
+  <!-- Position-Specific Gating -->
+  <rect x="850" y="450" width="200" height="80" fill="#ffcdd2" stroke="#c62828" stroke-width="2" rx="5" ry="5"/>
+  <text x="950" y="475" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Apply Gates</text>
+  <text x="950" y="500" font-family="Arial" font-size="12" text-anchor="middle">F̃¹ = S¹ ⊙ F̂¹</text>
+  
+  <rect x="850" y="600" width="200" height="80" fill="#ffcdd2" stroke="#c62828" stroke-width="2" rx="5" ry="5"/>
+  <text x="950" y="625" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Apply Gates</text>
+  <text x="950" y="650" font-family="Arial" font-size="12" text-anchor="middle">F̃² = S² ⊙ F̂²</text>
+  
+  <!-- Sum and Projection -->
+  <rect x="1050" y="520" width="100" height="80" fill="#dcedc8" stroke="#33691e" stroke-width="2" rx="5" ry="5"/>
+  <text x="1100" y="555" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Sum</text>
+  <text x="1100" y="580" font-family="Arial" font-size="12" text-anchor="middle">F_fused = ∑F̃ᵢ</text>
+  
+  <rect x="1050" y="650" width="100" height="120" fill="#d1c4e9" stroke="#4527a0" stroke-width="2" rx="5" ry="5"/>
+  <text x="1100" y="685" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Projection</text>
+  <text x="1100" y="710" font-family="Arial" font-size="12" text-anchor="middle">F_out = Dropout(</text>
+  <text x="1100" y="730" font-family="Arial" font-size="12" text-anchor="middle">LN(W_p(F_fused)))</text>
+  <text x="1100" y="750" font-family="Arial" font-size="12" text-anchor="middle">B×L×D_out tensor</text>
+  
+  <!-- Example Visualization for Vietnamese "á" -->
+  <rect x="680" y="750" width="470" height="130" fill="white" stroke="#757575" stroke-width="2" rx="5" ry="5"/>
+  <text x="915" y="775" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Example: Vietnamese "á"</text>
+  <text x="710" y="795" font-family="Arial" font-size="14" text-anchor="start">Global weights: Layer -1: 0.6, Layer -4: 0.4</text>
+  <text x="710" y="820" font-family="Arial" font-size="14" text-anchor="start">Gate values for 'a' body: Layer -1 ≈ 0.8, Layer -4 ≈ 0.3</text>
+  <text x="710" y="845" font-family="Arial" font-size="14" text-anchor="start">Gate values for acute mark: Layer -1 ≈ 0.4, Layer -4 ≈ 0.9</text>
+  <text x="710" y="870" font-family="Arial" font-size="14" text-anchor="start">Result: Enhanced representation of both base shape and diacritic</text>
+  
+  <!-- Vietnamese Character Feature Map visualization -->
+  <rect x="50" y="450" width="220" height="280" fill="white" stroke="#757575" stroke-width="2" rx="5" ry="5"/>
+  <text x="160" y="475" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Feature Maps for "á"</text>
+  
+  <!-- Simple "á" visualization and feature activations -->
+  <text x="160" y="510" font-family="Arial" font-size="42" text-anchor="middle">á</text>
+  
+  <text x="100" y="550" font-family="Arial" font-size="14" text-anchor="start">Layer -1 activations:</text>
+  <!-- Feature map 1 heatmap representation -->
+  <rect x="90" y="560" width="30" height="30" fill="#ffcccb" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="560" width="30" height="30" fill="#ff7f7f" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="560" width="30" height="30" fill="#ffcccb" stroke="#757575" stroke-width="1"/>
+  <rect x="90" y="590" width="30" height="30" fill="#ff5252" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="590" width="30" height="30" fill="#d50000" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="590" width="30" height="30" fill="#ff5252" stroke="#757575" stroke-width="1"/>
+  <rect x="90" y="620" width="30" height="30" fill="#ffcccb" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="620" width="30" height="30" fill="#ff7f7f" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="620" width="30" height="30" fill="#ffcccb" stroke="#757575" stroke-width="1"/>
+  <rect x="90" y="650" width="30" height="30" fill="#ffe5e5" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="650" width="30" height="30" fill="#ffcccb" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="650" width="30" height="30" fill="#ffe5e5" stroke="#757575" stroke-width="1"/>
+  
+  <text x="100" y="695" font-family="Arial" font-size="14" text-anchor="start">Layer -4 activations:</text>
+  <!-- Feature map 2 heatmap representation -->
+  <rect x="90" y="705" width="30" height="30" fill="#e3f2fd" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="705" width="30" height="30" fill="#90caf9" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="705" width="30" height="30" fill="#e3f2fd" stroke="#757575" stroke-width="1"/>
+  <rect x="90" y="735" width="30" height="30" fill="#90caf9" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="735" width="30" height="30" fill="#bbdefb" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="735" width="30" height="30" fill="#90caf9" stroke="#757575" stroke-width="1"/>
+  <rect x="90" y="765" width="30" height="30" fill="#42a5f5" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="765" width="30" height="30" fill="#1e88e5" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="765" width="30" height="30" fill="#42a5f5" stroke="#757575" stroke-width="1"/>
+  <rect x="90" y="795" width="30" height="30" fill="#1976d2" stroke="#757575" stroke-width="1"/>
+  <rect x="120" y="795" width="30" height="30" fill="#0d47a1" stroke="#757575" stroke-width="1"/>
+  <rect x="150" y="795" width="30" height="30" fill="#1976d2" stroke="#757575" stroke-width="1"/>
+  
+  <!-- Connection lines -->
+  <!-- From input features to mean pooling -->
+  <path d="M270 180 H320" fill="none" stroke="#1565c0" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M270 340 H320" fill="none" stroke="#1565c0" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From mean pooling to concatenation -->
+  <path d="M500 180 H525 Q535 180 535 190 V225 H550" fill="none" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M500 340 H525 Q535 340 535 330 V315 H550" fill="none" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From concatenation to global context encoder -->
+  <path d="M750 270 H800" fill="none" stroke="#ff8f00" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From global context to global weights application -->
+  <path d="M925 320 V385 Q925 395 915 395 H710 Q700 395 700 405 V450" fill="none" stroke="#6a1b9a" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M925 320 V385 Q925 395 915 395 H710 Q700 395 700 405 V550 Q700 560 700 570 V600" fill="none" stroke="#6a1b9a" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From input features to gate generators -->
+  <path d="M160 240 Q160 420 160 450 H175 Q185 450 195 450 H320" fill="none" stroke="#1565c0" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M160 400 Q160 450 160 510 V600 H320" fill="none" stroke="#1565c0" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From gate generators to apply gates -->
+  <path d="M520 490 H850" fill="none" stroke="#e65100" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M520 640 H850" fill="none" stroke="#e65100" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From global weights application to apply gates -->
+  <path d="M800 490 H850" fill="none" stroke="#0277bd" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M800 640 H850" fill="none" stroke="#0277bd" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From apply gates to sum -->
+  <path d="M1050 490 H1075 Q1085 490 1085 500 V520" fill="none" stroke="#c62828" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M1050 640 H1075 Q1085 640 1085 630 V600" fill="none" stroke="#c62828" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- From sum to projection -->
+  <path d="M1100 600 V650" fill="none" stroke="#33691e" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+  </defs>
+</svg>

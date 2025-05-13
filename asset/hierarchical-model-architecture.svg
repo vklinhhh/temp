@@ -1,0 +1,112 @@
+<svg viewBox="0 0 940 1100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="940" height="1100" fill="#f8f9fa" rx="10" ry="10"/>
+  <text x="470" y="40" font-family="Arial" font-size="24" text-anchor="middle" font-weight="bold">Hierarchical CTC Multi-Scale Vietnamese OCR Architecture</text>
+  
+  <!-- Input image -->
+  <rect x="360" y="70" width="220" height="60" fill="#e3f2fd" stroke="#1565c0" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="105" font-family="Arial" font-size="16" text-anchor="middle">Vietnamese Text Image Input</text>
+  
+  <!-- Vision Encoder -->
+  <rect x="320" y="160" width="300" height="100" fill="#bbdefb" stroke="#1976d2" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="185" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Vision Encoder (TrOCR)</text>
+  <text x="470" y="210" font-family="Arial" font-size="14" text-anchor="middle">Extracts visual features from multiple</text>
+  <text x="470" y="230" font-family="Arial" font-size="14" text-anchor="middle">encoder layers at different scales</text>
+  <text x="470" y="250" font-family="Arial" font-size="14" text-anchor="middle">(typically layer -1 and layer -4)</text>
+  
+  <!-- Dynamic Multi-Scale Fusion (HIGHLIGHTED) -->
+  <rect x="280" y="290" width="380" height="110" fill="#c8e6c9" stroke="#2e7d32" stroke-width="4" rx="5" ry="5"/>
+  <text x="470" y="315" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Dynamic Multi-Scale Fusion</text>
+  <text x="470" y="340" font-family="Arial" font-size="14" text-anchor="middle">Adaptively combines features from different</text>
+  <text x="470" y="360" font-family="Arial" font-size="14" text-anchor="middle">encoder layers based on content</text>
+  <text x="470" y="380" font-family="Arial" font-size="14" text-anchor="middle">using global context and position-specific gates</text>
+  
+  <!-- Local Feature Enhancer (HIGHLIGHTED) -->
+  <rect x="280" y="430" width="380" height="110" fill="#ffecb3" stroke="#ff8f00" stroke-width="4" rx="5" ry="5"/>
+  <text x="470" y="455" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Local Feature Enhancer</text>
+  <text x="470" y="480" font-family="Arial" font-size="14" text-anchor="middle">Enhances diacritical mark detection with</text>
+  <text x="470" y="500" font-family="Arial" font-size="14" text-anchor="middle">region-specific attention (above/middle/below)</text>
+  <text x="470" y="520" font-family="Arial" font-size="14" text-anchor="middle">and diacritic prototypes</text>
+  
+  <!-- Positional Encoding -->
+  <rect x="320" y="570" width="300" height="60" fill="#e1bee7" stroke="#8e24aa" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="595" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Positional Encoding</text>
+  <text x="470" y="615" font-family="Arial" font-size="14" text-anchor="middle">Adds position information to features</text>
+  
+  <!-- Transformer Encoder -->
+  <rect x="320" y="660" width="300" height="80" fill="#d1c4e9" stroke="#512da8" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="685" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Transformer Encoder</text>
+  <text x="470" y="705" font-family="Arial" font-size="14" text-anchor="middle">Multi-head self-attention layers</text>
+  <text x="470" y="725" font-family="Arial" font-size="14" text-anchor="middle">process enhanced feature sequence</text>
+  
+  <!-- Shared Layer -->
+  <rect x="320" y="770" width="300" height="60" fill="#b2dfdb" stroke="#00796b" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="795" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Shared Feature Layer</text>
+  <text x="470" y="815" font-family="Arial" font-size="14" text-anchor="middle">Common representation for all heads</text>
+  
+  <!-- Hierarchical Heads -->
+  <rect x="70" y="860" width="260" height="80" fill="#f8bbd0" stroke="#c2185b" stroke-width="2" rx="5" ry="5"/>
+  <text x="200" y="885" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Base Character Classifier</text>
+  <text x="200" y="905" font-family="Arial" font-size="14" text-anchor="middle">Predicts base character</text>
+  <text x="200" y="925" font-family="Arial" font-size="14" text-anchor="middle">(e.g., 'a', 'e', 'o')</text>
+  
+  <rect x="340" y="860" width="260" height="80" fill="#ffccbc" stroke="#e64a19" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="885" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Diacritic Classifier</text>
+  <text x="470" y="905" font-family="Arial" font-size="14" text-anchor="middle">Predicts diacritic mark</text>
+  <text x="470" y="925" font-family="Arial" font-size="14" text-anchor="middle">(e.g., 'acute', 'grave', 'hook')</text>
+  
+  <rect x="610" y="860" width="260" height="80" fill="#ffcdd2" stroke="#d32f2f" stroke-width="2" rx="5" ry="5"/>
+  <text x="740" y="885" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Combined Character Classifier</text>
+  <text x="740" y="905" font-family="Arial" font-size="14" text-anchor="middle">Predicts full combined character</text>
+  <text x="740" y="925" font-family="Arial" font-size="14" text-anchor="middle">(e.g., 'á', 'à', 'ả')</text>
+  
+  <!-- CTC Loss -->
+  <rect x="320" y="970" width="300" height="60" fill="#fff9c4" stroke="#f9a825" stroke-width="2" rx="5" ry="5"/>
+  <text x="470" y="995" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">CTC Loss</text>
+  <text x="470" y="1015" font-family="Arial" font-size="14" text-anchor="middle">Alignment-free sequence prediction</text>
+  
+  <!-- Arrows -->
+  <!-- Input to Vision Encoder -->
+  <path d="M470 130 L470 160" fill="none" stroke="#1976d2" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Vision Encoder to Dynamic Fusion -->
+  <path d="M470 260 L470 290" fill="none" stroke="#1976d2" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Dynamic Fusion to Feature Enhancer -->
+  <path d="M470 400 L470 430" fill="none" stroke="#2e7d32" stroke-width="3" marker-end="url(#arrowhead)"/>
+  
+  <!-- Feature Enhancer to Positional Encoding -->
+  <path d="M470 540 L470 570" fill="none" stroke="#ff8f00" stroke-width="3" marker-end="url(#arrowhead)"/>
+  
+  <!-- Positional Encoding to Transformer -->
+  <path d="M470 630 L470 660" fill="none" stroke="#8e24aa" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Transformer to Shared Layer -->
+  <path d="M470 740 L470 770" fill="none" stroke="#512da8" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Shared Layer to Classifiers -->
+  <path d="M320 800 L200 800 L200 860" fill="none" stroke="#00796b" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M470 830 L470 860" fill="none" stroke="#00796b" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M620 800 L740 800 L740 860" fill="none" stroke="#00796b" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Base to Diacritic Conditioning -->
+  <path d="M300 900 L350 900" fill="none" stroke="#c2185b" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead)"/>
+  <text x="320" y="890" font-family="Arial" font-size="12" text-anchor="middle">Conditions</text>
+  
+  <!-- Classifiers to CTC Loss -->
+  <path d="M740 940 L740 1000 L620 1000" fill="none" stroke="#d32f2f" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+  </defs>
+  
+  <!-- Legend for highlighted components -->
+  <rect x="50" y="1050" width="20" height="20" fill="#c8e6c9" stroke="#2e7d32" stroke-width="2"/>
+  <text x="80" y="1065" font-family="Arial" font-size="14">Dynamic Multi-Scale Fusion (Highlighted Component #1)</text>
+  
+  <rect x="400" y="1050" width="20" height="20" fill="#ffecb3" stroke="#ff8f00" stroke-width="2"/>
+  <text x="430" y="1065" font-family="Arial" font-size="14">Local Feature Enhancer (Highlighted Component #2)</text>
+</svg>
