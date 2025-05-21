@@ -9,6 +9,8 @@ from tqdm.auto import tqdm
 import logging
 import gc
 from torch.cuda.amp import GradScaler, autocast
+from utils.compatibility_logging import log_compatibility_matrix
+
 
 # --- Update imports ---
 # Note: We KEEP using compute_ctc_validation_metrics as the hierarchical model
@@ -83,6 +85,7 @@ def train_ctc_model(
     eval_steps=None,
     early_stopping_patience=5,
     early_stopping_metric='val_loss',
+    log_compatibility_matrix_interval=5000,
 ):
     """
     Training function for CTC-based OCR models (single or hierarchical head).
@@ -311,6 +314,14 @@ def train_ctc_model(
                         # --- End Defensive Scaler Handling ---
 
                         optimizer_steps += 1
+                        if (optimizer_steps % log_compatibility_matrix_interval == 0 and hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None):
+                            log_compatibility_matrix(
+                                model=model,
+                                epoch=current_epoch_num,
+                                step=optimizer_steps,
+                                output_dir=output_dir,
+                                log_interval=1  # Always log when we reach here
+                            )
                         # --- Logging & Optional Eval ---
                         current_lr = optimizer.param_groups[0]['lr']
                         progress_bar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{current_lr:.2e}")
@@ -351,7 +362,14 @@ def train_ctc_model(
                     continue
 
             # --- End of Batch Loop ---
-
+            if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
+                log_compatibility_matrix(
+                    model=model,
+                    epoch=current_epoch_num,
+                    step=optimizer_steps,
+                    output_dir=output_dir,
+                    log_interval=1  # Always log when we reach here
+                )
             # --- End of Epoch Validation, Logging, Saving ---
             avg_train_loss = epoch_train_loss / batches_processed_in_epoch if batches_processed_in_epoch > 0 else 0.0
             logger.info(f"Running end-of-epoch {current_epoch_num} validation...")
@@ -425,6 +443,7 @@ def train_ctc_model(
             try: wandb_run.finish(exit_code=exit_code)
             except Exception as wandb_e: logger.error(f"Wandb finish error: {wandb_e}")
 
-        if training_exception and not isinstance(training_exception, KeyboardInterrupt): raise training_exception
+        if training_exception and not isinstance(training_exception, str) and not isinstance(training_exception, KeyboardInterrupt):
+            raise training_exception
 
     return model

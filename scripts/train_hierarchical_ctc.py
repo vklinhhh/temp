@@ -118,7 +118,8 @@ def main():
     parser.add_argument('--test_dataset_name', type=str, default='vklinhhh/test_vietnamese_cwl')
     parser.add_argument('--test_dataset_split', type=str, default='train')
     # parser.add_argument('--ignore_scaler_state_on_resume', action='store_true') # Removed as a primary solution
-
+    parser.add_argument('--log_compatibility_interval', type=int, default=5000, 
+                   help='How often to log compatibility matrix (steps)')
     args = parser.parse_args()
 
     # --- Setup ---
@@ -175,7 +176,7 @@ def main():
         if 'validation' not in hf_dataset or 'train' not in hf_dataset:
             logger.warning(f'Splitting train set for validation.')
             if args.val_split <= 0: raise ValueError('--val_split required')
-            split_dataset = hf_dataset['train'].train_test_split(test_size=args.val_split, seed=args.seed)
+            split_dataset = hf_dataset['train'].select(range(0,100000,1)).train_test_split(test_size=args.val_split, seed=args.seed)
             hf_dataset = DatasetDict({'train': split_dataset['train'], 'validation': split_dataset['test']})
         train_hf_split = hf_dataset['train']
         val_hf_split = hf_dataset['validation']
@@ -352,7 +353,7 @@ def main():
         resumed_optimizer_steps=resumed_optimizer_steps,
         resumed_best_val_metric=resumed_best_val_metric,
         best_metric_name=args.early_stopping_metric,
-        project_name=None, # Pass None, WandB initialized in this script
+        project_name="", # Pass empty string, WandB initialized in this script
         run_name=None,
         log_interval=args.log_interval,
         save_checkpoint_prefix='checkpoint',
@@ -363,6 +364,7 @@ def main():
         eval_steps=args.eval_steps,
         early_stopping_patience=args.early_stopping_patience,
         early_stopping_metric=args.early_stopping_metric,
+        log_compatibility_matrix_interval=args.log_compatibility_interval,
     )
 
     logger.info(f"============ Training finished ============")
