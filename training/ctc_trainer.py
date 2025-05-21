@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 import logging
 import gc
 from torch.cuda.amp import GradScaler, autocast
-from utils.compatibility_logging import log_compatibility_matrix
+from utils.compatibility_logging import log_compatibility_matrix, track_compatibility_matrix_gradients
 
 
 # --- Update imports ---
@@ -266,7 +266,15 @@ def train_ctc_model(
 
                     # --- Scaled Backward Pass ---
                     scaler.scale(normalized_loss).backward()
-
+                    if (optimizer_steps % log_compatibility_matrix_interval == 0 and hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None):
+                        # Track gradients BEFORE optimizer step (they exist now)
+                        track_compatibility_matrix_gradients(
+                            model=model,
+                            epoch=current_epoch_num,
+                            step=optimizer_steps,
+                            output_dir=output_dir,
+                            log_interval=1  # Always log when we reach here
+                        )
                     # --- Accumulate Loss for Logging ---
                     epoch_train_loss += loss.item()
                     batches_processed_in_epoch += 1
@@ -363,6 +371,17 @@ def train_ctc_model(
 
             # --- End of Batch Loop ---
             if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
+                # Check if gradients exist before tracking (may not exist at epoch end)
+                if model.character_diacritic_compatibility.compatibility_matrix.grad is not None:
+                    track_compatibility_matrix_gradients(
+                        model=model,
+                        epoch=current_epoch_num,
+                        step=optimizer_steps,
+                        output_dir=output_dir,
+                        log_interval=1  # Always log when we reach here
+                    )
+                
+                # Log the matrix itself
                 log_compatibility_matrix(
                     model=model,
                     epoch=current_epoch_num,

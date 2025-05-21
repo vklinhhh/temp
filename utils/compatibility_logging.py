@@ -155,3 +155,49 @@ def visualize_compatibility_matrix(
     if return_fig:
         return fig, ax
     return None
+
+
+# utils/compatibility_logging.py
+
+def track_compatibility_matrix_gradients(model, epoch, step, output_dir, log_interval=1000):
+    """Track the gradients flowing to compatibility matrix during training."""
+    if step % log_interval != 0:
+        return
+    
+    if not hasattr(model, 'character_diacritic_compatibility') or model.character_diacritic_compatibility is None:
+        return
+    
+    compat_module = model.character_diacritic_compatibility
+    compat_matrix = compat_module.compatibility_matrix
+    
+    # Check if matrix has gradients
+    if compat_matrix.grad is None:
+        print(f"WARNING: Compatibility matrix has no gradients at step {step}!")
+        return
+    
+    # Get gradient statistics
+    grad_mean = compat_matrix.grad.abs().mean().item()
+    grad_max = compat_matrix.grad.abs().max().item()
+    
+    print(f"Compatibility Matrix Gradients - Step {step} - Mean: {grad_mean:.6f}, Max: {grad_max:.6f}")
+    
+    # Save gradient data
+    grad_dir = os.path.join(output_dir, "compatibility_gradients")
+    os.makedirs(grad_dir, exist_ok=True)
+    
+    # Save gradient statistics to a CSV file
+    import csv
+    csv_path = os.path.join(grad_dir, "gradient_stats.csv")
+    
+    # Check if file exists
+    file_exists = os.path.isfile(csv_path)
+    
+    with open(csv_path, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(['epoch', 'step', 'grad_mean', 'grad_max'])
+        writer.writerow([epoch, step, grad_mean, grad_max])
+    
+    # Save raw gradient data (optional, can be large)
+    # np.save(os.path.join(grad_dir, f"compat_matrix_grad_e{epoch}_s{step}.npy"), 
+    #         compat_matrix.grad.detach().cpu().numpy())

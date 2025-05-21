@@ -335,11 +335,19 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         standard_diacritic_logits = self.diacritic_classifier(diacritic_input_features)
         current_diacritic_logits = standard_diacritic_logits
         vda_raw_output, visual_diacritic_attention_maps = None, None
+        compatibility_matrices = []
+        
         if self.visual_diacritic_attention:
             res = self.visual_diacritic_attention(diacritic_input_features, return_attention_weights=True)
             vda_raw_output, visual_diacritic_attention_maps = res if isinstance(res, tuple) else (res, None)
             current_diacritic_logits = current_diacritic_logits + vda_raw_output
-        if self.character_diacritic_compatibility: current_diacritic_logits = current_diacritic_logits + self.character_diacritic_compatibility(base_logits, diacritic_input_features)
+        if self.character_diacritic_compatibility:
+            # Get compatibility bias and matrix
+            compat_bias, compat_matrix = self.character_diacritic_compatibility(base_logits, diacritic_input_features)
+            current_diacritic_logits = current_diacritic_logits + compat_bias
+            compatibility_matrices.append(compat_matrix)  # Save for loss function
+
+        
         if self.few_shot_diacritic_adapter: current_diacritic_logits = current_diacritic_logits + self.few_shot_diacritic_adapter(diacritic_input_features)
         diacritic_logits = current_diacritic_logits
 
@@ -347,28 +355,118 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         final_logits = self.final_classifier(shared_features)
 
         # 9. CTC Loss
-        loss = None
+        loss = None # Will hold the final combined loss if labels are provided
+        
+        # Initialize components of the loss
+        ctc_loss_component = torch.tensor(0.0, device=pixel_values.device)
+        reg_loss_component = torch.tensor(0.0, device=pixel_values.device)
+
         if labels is not None and label_lengths is not None:
-            log_probs = final_logits.log_softmax(dim=2).permute(1, 0, 2)
-            device = log_probs.device; time_steps = log_probs.size(0); bs = log_probs.size(1)
-            input_lengths = torch.full((bs,), time_steps, dtype=torch.long, device=device)
-            labels_dev, label_lengths_dev = labels.to(device), label_lengths.to(device)
-            input_lengths_clamped = torch.clamp(input_lengths, max=time_steps)
-            label_lengths_clamped = torch.clamp(label_lengths_dev, max=labels_dev.size(1))
+            # A. Calculate CTC Loss for final_logits
+            log_probs = final_logits.log_softmax(dim=2).permute(1, 0, 2) # (SeqLen, Batch, VocabSize)
+            
+            current_device = log_probs.device
+            seq_len = log_probs.size(0)
+            batch_size = log_probs.size(1)
+            
+            input_lengths = torch.full((batch_size,), seq_len, dtype=torch.long, device=current_device)
+            
+            labels_on_device = labels.to(current_device)
+            label_lengths_on_device = label_lengths.to(current_device)
+            
+            # Clamp label lengths to be at most the size of the label tensor's second dimension
+            # and also ensure they are not greater than input_lengths (seq_len)
+            clamped_label_lengths = torch.clamp(label_lengths_on_device, max=labels_on_device.size(1))
+            clamped_label_lengths = torch.clamp(clamped_label_lengths, max=seq_len)
+
+
+            # Ensure CTCLoss requires_grad if it's zero (e.g., no valid samples)
+            # so that subsequent addition of reg_loss_component doesn't lose its grad requirement.
+            ctc_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True) 
+            
             try:
                 ctc_loss_fn = nn.CTCLoss(blank=self.config.blank_idx, reduction='mean', zero_infinity=True)
-                valid_mask = label_lengths_dev > 0
-                if torch.any(valid_mask):
-                    loss = ctc_loss_fn(log_probs[:, valid_mask, :], labels_dev[valid_mask], input_lengths_clamped[valid_mask], label_lengths_clamped[valid_mask])
-                    if torch.isnan(loss) or torch.isinf(loss): loss = torch.tensor(0.0, device=device, requires_grad=True)
-                else: loss = torch.tensor(0.0, device=device, requires_grad=True)
-            except Exception as e: logger.error(f"CTC loss error: {e}"); loss = torch.tensor(0.0, device=device, requires_grad=True)
+                
+                # Mask for valid samples (label length > 0)
+                valid_samples_mask = clamped_label_lengths > 0
+                
+                if torch.any(valid_samples_mask):
+                    # Select only valid entries for CTC loss
+                    active_log_probs = log_probs[:, valid_samples_mask, :]
+                    active_labels = labels_on_device[valid_samples_mask]
+                    active_input_lengths = input_lengths[valid_samples_mask] # All input_lengths are seq_len
+                    active_label_lengths = clamped_label_lengths[valid_samples_mask]
 
-        output_dict = {'loss': loss, 'logits': final_logits, 'base_logits': base_logits, 'diacritic_logits': diacritic_logits}
+                    # Guard against label_length > input_length for selected active samples,
+                    # though clamping label_lengths to seq_len should largely prevent this.
+                    # For safety, ensure all active_label_lengths <= active_input_lengths
+                    mask_len_ok = active_label_lengths <= active_input_lengths
+                    if not torch.all(mask_len_ok):
+                        # This indicates an issue, but for robustness, filter/adjust
+                        logger.warning(f"Found {torch.sum(~mask_len_ok)} samples where label_length > input_length after initial clamping. Filtering these for CTC.")
+                        active_log_probs = active_log_probs[:, mask_len_ok, :]
+                        active_labels = active_labels[mask_len_ok]
+                        active_input_lengths = active_input_lengths[mask_len_ok]
+                        active_label_lengths = active_label_lengths[mask_len_ok]
+                    
+                    if active_labels.numel() > 0: # If any samples remain after filtering
+                        calculated_ctc_loss = ctc_loss_fn(
+                            active_log_probs,
+                            active_labels,
+                            active_input_lengths,
+                            active_label_lengths
+                        )
+                        if not (torch.isnan(calculated_ctc_loss) or torch.isinf(calculated_ctc_loss)):
+                            ctc_loss_component = calculated_ctc_loss
+                        else:
+                            logger.warning("CTC loss resulted in NaN or Inf. Using 0.0 for this component.")
+                            # ctc_loss_component remains 0.0 with requires_grad=True
+                # If no valid samples, ctc_loss_component remains 0.0 with requires_grad=True
+            except Exception as e:
+                logger.error(f"CTC loss calculation error: {e}", exc_info=True)
+                # ctc_loss_component remains 0.0 with requires_grad=True
+
+            # B. Calculate Compatibility Regularization Loss
+            if hasattr(self, 'character_diacritic_compatibility') and \
+               self.character_diacritic_compatibility is not None and \
+               self.config.use_character_diacritic_compatibility: # Check the config flag too
+                
+                compat_matrix = self.character_diacritic_compatibility.compatibility_matrix
+                
+                # 1. Encourage mean to be slightly negative (e.g., -0.1)
+                mean_val = compat_matrix.mean()
+                target_mean = torch.tensor(-0.1, device=mean_val.device)
+                loss_mean_reg = F.mse_loss(mean_val, target_mean)
+                
+                # 2. Encourage variance (e.g., target variance of 1.0)
+                # Use unbiased=False for consistency with the original calculation if it was ((X - mu)^2).mean()
+                variance_val = torch.var(compat_matrix, unbiased=False) 
+                target_variance = torch.tensor(1.0, device=variance_val.device)
+                loss_var_reg = F.mse_loss(variance_val, target_variance)
+                
+                # Combine regularization terms with a small weight
+                reg_loss_component = 0.001 * (loss_mean_reg + loss_var_reg)
+            
+            # C. Combine losses
+            loss = ctc_loss_component + reg_loss_component
+        
+        # Populate output dictionary
+        output_dict = {
+            'loss': loss, 
+            'logits': final_logits, 
+            'base_logits': base_logits, 
+            'diacritic_logits': diacritic_logits
+        }
         if return_diacritic_attention and visual_diacritic_attention_maps is not None:
             output_dict['visual_diacritic_attention_maps'] = visual_diacritic_attention_maps
-        if grad_cam_target_layer_module_name: # Store relevant logits for Grad-CAM backward pass
-            output_dict['grad_cam_target_logits'] = vda_raw_output if self.visual_diacritic_attention and vda_raw_output is not None else diacritic_logits
+        
+        if grad_cam_target_layer_module_name:
+            grad_cam_target_logits = diacritic_logits # Default target for CAM on diacritics
+            if self.visual_diacritic_attention and vda_raw_output is not None:
+                 # If VDA is active and produced output, it's a more specific target
+                grad_cam_target_logits = vda_raw_output
+            output_dict['grad_cam_target_logits'] = grad_cam_target_logits
+            
         return output_dict
 
     def save_pretrained(self, save_directory, **kwargs):

@@ -38,7 +38,7 @@ logger = logging.getLogger('TrainHierarchicalMultiScaleScript') # Updated logger
 BASE_CHAR_VOCAB_HIER = [
     '<blank>', '<unk>', 'a', 'b', 'c', 'd', 'e', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'o', 'p',
     'q', 'r', 's', 't', 'u', 'v', 'x', 'y', 'A', 'B', 'C', 'D', 'E', 'G', 'H', 'I', 'K',
-    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'đ', 'Đ', 'f', 'F',
+    'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'f', 'F',
     'j', 'J', 'w', 'W', 'z', 'Z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ' ',
     ',', '.', '?', '!', ':', ';', '-', '_', '(', ')', '[', ']', '{', '}', "'", '"', '/',
     '\\', '@', '#', '$', '%', '^', '&', '*', '+', '=', '<', '>', '|',
@@ -236,7 +236,17 @@ def main():
     except Exception as model_init_e:
         logger.error(f"FATAL: Model init failed: {model_init_e}", exc_info=True)
         return 1
-
+    if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
+        # Force reinitialize the compatibility matrix
+        logger.info("Forcefully reinitializing compatibility matrix...")
+        with torch.no_grad():
+            # Initialize with small random values
+            model.character_diacritic_compatibility.compatibility_matrix.data = torch.randn_like(
+                model.character_diacritic_compatibility.compatibility_matrix
+            ) * 0.1
+            
+            # Make sure requires_grad is True
+            model.character_diacritic_compatibility.compatibility_matrix.requires_grad_(True)
     # --- Create Datasets ---
     try:
         logger.info('Creating CTC dataset wrappers (using combined vocab)...')
@@ -258,6 +268,28 @@ def main():
         logger.info("Optimizer/Scheduler created.")
     except Exception as opt_sched_e: logger.error(f"FATAL: Opt/Sched failed: {opt_sched_e}", exc_info=True); return 1
 
+    compat_matrix_in_optimizer = False
+    if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
+        target_param = model.character_diacritic_compatibility.compatibility_matrix
+        for i, param_group in enumerate(optimizer.param_groups):
+            if any(p is target_param for p in param_group['params']):
+                logger.info(f"Compatibility matrix found in optimizer param_group {i} with initial lr={param_group['lr']}")
+                compat_matrix_in_optimizer = True
+                
+                original_lr = param_group['lr']
+                lr_multiplier = 25.0 # << INCREASED FROM 5.0 to 25.0 (or try 10, 50)
+                param_group['lr'] = original_lr * lr_multiplier
+                logger.info(f"Increased compatibility matrix learning rate in param_group {i} to {param_group['lr']} (original: {original_lr}, multiplier: {lr_multiplier})")
+                
+                # Optional: Reduce or remove weight decay specifically for this parameter
+                original_wd = param_group.get('weight_decay', args.weight_decay)
+                if original_wd > 0: # Only modify if wd is active
+                    param_group['weight_decay'] = 0.0 # No weight decay for this matrix
+                    logger.info(f"Set weight_decay for compatibility matrix param_group {i} to 0.0 (original: {original_wd})")
+                break
+
+    if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None and not compat_matrix_in_optimizer:
+        logger.warning("Compatibility matrix parameter NOT found in any optimizer parameter group! It will not be updated.")
     # --- Handle Resuming (Full State) ---
     start_epoch = 0; resumed_optimizer_steps = 0; higher_is_better = args.early_stopping_metric not in ['val_loss', 'val_cer', 'val_wer']; resumed_best_val_metric = -float('inf') if higher_is_better else float('inf'); scaler_state_to_load = None; checkpoint_to_load = args.resume_from_checkpoint
     if checkpoint_to_load is None and not args.load_weights_from:
