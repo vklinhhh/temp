@@ -63,7 +63,7 @@ def main():
     parser.add_argument('--load_weights_from', type=str, default=None, help="Load pre-trained vision encoder, other layers random.")
 
     # Multi-Scale Fusion Arguments
-    parser.add_argument('--fusion_layers', type=str, default="-1,-4", help='Comma-separated vision encoder layer indices to fuse (e.g., "-1,-4").')
+    parser.add_argument('--fusion_layers', type=str, default="-1,-4,-7", help='Comma-separated vision encoder layer indices to fuse (e.g., "-1,-4").')
     parser.add_argument('--fusion_method', type=str, default="concat_proj", choices=['concat_proj', 'add', 'bilinear', 'none'], help='Method to fuse features.')
     
     # --- NEW: Dynamic Fusion options ---
@@ -89,7 +89,7 @@ def main():
     parser.add_argument('--epochs', type=int, default=30)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learning_rate', type=float, default=1e-4)
-    parser.add_argument('--val_split', type=float, default=0.1)
+    parser.add_argument('--val_split', type=float, default=0.05)
     parser.add_argument('--weight_decay', type=float, default=0.01)
     parser.add_argument('--warmup_ratio', type=float, default=0.1)
     parser.add_argument('--grad_accumulation', type=int, default=1)
@@ -108,7 +108,7 @@ def main():
     parser.add_argument('--log_interval', type=int, default=5000)
     parser.add_argument('--eval_steps', type=int, default=None)
     parser.add_argument('--use_amp', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=4) # Default from your previous script
+    parser.add_argument('--num_workers', type=int, default=16) # Default from your previous script
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--discriminative_lr', action='store_true')
     parser.add_argument('--encoder_lr_factor', type=float, default=0.1)
@@ -128,7 +128,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'); logger.info(f"Device: {device}")
     run_name_to_use = args.wandb_run_name or os.path.basename(args.output_dir) or "hier_ctc_multiscale_run"
     try: fusion_layer_indices = [int(x.strip()) for x in args.fusion_layers.split(',')]
-    except: logger.error(f"Invalid --fusion_layers. Using default [-1,-4]."); fusion_layer_indices = [-1,-4]
+    except: logger.error(f"Invalid --fusion_layers. Using default [-1,-4]."); fusion_layer_indices = [-1,-4,-7]
 
     # --- Build COMBINED Vocab ---
     # --- Build COMBINED Character Vocabulary for final CTC output ---
@@ -176,7 +176,7 @@ def main():
         if 'validation' not in hf_dataset or 'train' not in hf_dataset:
             logger.warning(f'Splitting train set for validation.')
             if args.val_split <= 0: raise ValueError('--val_split required')
-            split_dataset = hf_dataset['train'].select(range(0,100000,1)).train_test_split(test_size=args.val_split, seed=args.seed)
+            split_dataset = hf_dataset['train'].train_test_split(test_size=args.val_split, seed=args.seed)
             hf_dataset = DatasetDict({'train': split_dataset['train'], 'validation': split_dataset['test']})
         train_hf_split = hf_dataset['train']
         val_hf_split = hf_dataset['validation']

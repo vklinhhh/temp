@@ -147,6 +147,7 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         if config.use_dynamic_fusion and num_fusion_layers > 1:
             logger.info(f"Using Dynamic Multi-Scale Fusion ({num_fusion_layers} layers -> {config.transformer_d_model} dim)")
             self.dynamic_fusion = DynamicMultiScaleFusion(encoder_hidden_size, num_fusion_layers, config.transformer_d_model)
+            self.post_static_fusion_norm = None # Not used with dynamic fusion
         elif config.feature_fusion_method == "concat_proj" and num_fusion_layers > 1:
             self.fusion_projection = nn.Linear(encoder_hidden_size * num_fusion_layers, config.transformer_d_model)
             logger.info(f"Using 'concat_proj' fusion (In: {encoder_hidden_size * num_fusion_layers}, Out: {config.transformer_d_model})")
@@ -157,30 +158,44 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         elif config.feature_fusion_method == "bilinear" and num_fusion_layers == 2:
              self.fusion_bilinear = nn.Bilinear(encoder_hidden_size, encoder_hidden_size, config.transformer_d_model)
              logger.info(f"Using 'bilinear' feature fusion (Out: {config.transformer_d_model})")
-        else: # 'none' or single layer selected, or fallback
+        else: # 'none' or single layer selected, or fallback for static fusion
              if encoder_hidden_size != config.transformer_d_model:
                   self.fusion_projection = nn.Linear(encoder_hidden_size, config.transformer_d_model)
                   logger.info(f"Projecting single/last selected encoder layer ({encoder_hidden_size}) to {config.transformer_d_model}")
-             else: sequence_model_input_size = encoder_hidden_size # Dims match
+             # If encoder_hidden_size == config.transformer_d_model, sequence_model_input_size is already encoder_hidden_size.
+             # No explicit fusion_projection needed if dimensions match and it's a single layer direct use.
+             # sequence_model_input_size is correctly set to config.transformer_d_model at the start.
+
+        # Added: LayerNorm after static fusion, if static fusion is configured.
+        # This norm operates on features of size config.transformer_d_model.
+        if not config.use_dynamic_fusion:
+            self.post_static_fusion_norm = nn.LayerNorm(config.transformer_d_model)
+            logger.info(f"Added LayerNorm after static fusion output (dim: {config.transformer_d_model})")
+        # else: self.post_static_fusion_norm = None # Already handled above
 
         # --- Local Feature Enhancer ---
         self.feature_enhancer = None
         if config.use_feature_enhancer:
             logger.info("Using Local Feature Enhancer")
-            self.feature_enhancer = LocalFeatureEnhancer(sequence_model_input_size, config.diacritic_vocab_size)
+            # Input to feature enhancer is the output of fusion, which is config.transformer_d_model
+            self.feature_enhancer = LocalFeatureEnhancer(config.transformer_d_model, config.diacritic_vocab_size)
+
 
         # --- Positional Encoding ---
-        if config.positional_encoding_type == "sinusoidal_1d": self.pos_encoder = SinusoidalPositionalEncoding1D(sequence_model_input_size, config.transformer_dropout, config.max_seq_len_for_pos_enc)
-        elif config.positional_encoding_type == "learned_1d": self.pos_encoder = LearnedPositionalEncoding1D(sequence_model_input_size, config.transformer_dropout, config.max_seq_len_for_pos_enc)
+        # Input to pos_encoder is config.transformer_d_model
+        if config.positional_encoding_type == "sinusoidal_1d": self.pos_encoder = SinusoidalPositionalEncoding1D(config.transformer_d_model, config.transformer_dropout, config.max_seq_len_for_pos_enc)
+        elif config.positional_encoding_type == "learned_1d": self.pos_encoder = LearnedPositionalEncoding1D(config.transformer_d_model, config.transformer_dropout, config.max_seq_len_for_pos_enc)
         else: self.pos_encoder = nn.Identity()
         logger.info(f"Positional Encoding: {config.positional_encoding_type}")
 
         # --- Transformer Encoder ---
-        logger.info(f"Adding {config.num_transformer_encoder_layers} Transformer Encoder layers (Dim: {sequence_model_input_size})")
-        if sequence_model_input_size % config.transformer_nhead != 0: raise ValueError("Transformer d_model must be divisible by nhead")
-        tf_encoder_layer = TransformerEncoderLayer(sequence_model_input_size, config.transformer_nhead, config.transformer_dim_feedforward, config.transformer_dropout, F.gelu, batch_first=True)
-        self.transformer_encoder = TransformerEncoder(tf_encoder_layer, config.num_transformer_encoder_layers, nn.LayerNorm(sequence_model_input_size))
-        transformer_output_size = sequence_model_input_size
+        # Input to transformer_encoder is config.transformer_d_model
+        logger.info(f"Adding {config.num_transformer_encoder_layers} Transformer Encoder layers (Dim: {config.transformer_d_model})")
+        if config.transformer_d_model % config.transformer_nhead != 0: raise ValueError("Transformer d_model must be divisible by nhead")
+        tf_encoder_layer = TransformerEncoderLayer(config.transformer_d_model, config.transformer_nhead, config.transformer_dim_feedforward, config.transformer_dropout, F.gelu, batch_first=True)
+        self.transformer_encoder = TransformerEncoder(tf_encoder_layer, config.num_transformer_encoder_layers, nn.LayerNorm(config.transformer_d_model))
+        transformer_output_size = config.transformer_d_model
+
 
         # --- Shared Feature Layer ---
         shared_layers_modules = []
@@ -227,8 +242,11 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
 
     def _init_weights(self): # Simplified for brevity, ensure it covers all custom layers
         logger.debug("Initializing weights for custom layers...")
-        # Example for a linear layer within a custom module:
-        # if self.my_custom_linear_layer: nn.init.xavier_uniform_(self.my_custom_linear_layer.weight)
+        # Standard PyTorch layers (Linear, LayerNorm, etc.) are initialized by default.
+        # Custom nn.Parameter (like in CharacterDiacriticCompatibility) are initialized where defined.
+        # This method can be expanded if specific non-default initializations are needed for custom modules.
+        pass
+
 
     # --- Grad-CAM Hook Methods ---
     def _save_activation(self, module, input, output):
@@ -306,15 +324,23 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
 
         # 2c. Apply Fusion
         fused_features = None
-        if self.dynamic_fusion: fused_features = self.dynamic_fusion(features_to_fuse)
+        if self.dynamic_fusion: # This is an nn.Module, check if it's defined
+            fused_features = self.dynamic_fusion(features_to_fuse)
         elif self.fusion_projection and self.config.feature_fusion_method == "concat_proj":
             fused_features = self.fusion_projection(torch.cat(features_to_fuse, dim=-1))
         elif self.pre_fusion_projections and self.config.feature_fusion_method == "add":
             fused_features = torch.stack([proj(feat) for proj, feat in zip(self.pre_fusion_projections, features_to_fuse)]).mean(0)
-        elif self.fusion_bilinear: fused_features = self.fusion_bilinear(features_to_fuse[0], features_to_fuse[1])
-        elif self.fusion_projection: fused_features = self.fusion_projection(features_to_fuse[-1]) # Single layer projection
-        else: fused_features = features_to_fuse[-1] # Direct use or fallback
+        elif self.fusion_bilinear: 
+            fused_features = self.fusion_bilinear(features_to_fuse[0], features_to_fuse[1])
+        elif self.fusion_projection: # Single layer projection
+            fused_features = self.fusion_projection(features_to_fuse[-1]) 
+        else: # Direct use of last selected layer if dimensions match, or fallback
+             fused_features = features_to_fuse[-1]
 
+        # Apply post_static_fusion_norm if it's defined (i.e., static fusion was configured)
+        if self.post_static_fusion_norm is not None:
+            fused_features = self.post_static_fusion_norm(fused_features)
+        
         # 3. Feature Enhancer
         enhanced_features = self.feature_enhancer(fused_features) if self.feature_enhancer else fused_features
         # 4. Positional Encoding
@@ -376,12 +402,13 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
             
             # Clamp label lengths to be at most the size of the label tensor's second dimension
             # and also ensure they are not greater than input_lengths (seq_len)
-            clamped_label_lengths = torch.clamp(label_lengths_on_device, max=labels_on_device.size(1))
-            clamped_label_lengths = torch.clamp(clamped_label_lengths, max=seq_len)
+            clamped_label_lengths = torch.clamp(label_lengths_on_device, min=0, max=labels_on_device.size(1)) # Ensure min=0
+            clamped_label_lengths = torch.clamp(clamped_label_lengths, min=0, max=seq_len) # Ensure min=0
 
 
             # Ensure CTCLoss requires_grad if it's zero (e.g., no valid samples)
             # so that subsequent addition of reg_loss_component doesn't lose its grad requirement.
+            # Initialize with requires_grad=True so that if no valid samples for CTC, this tensor can still accumulate gradients from reg_loss
             ctc_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True) 
             
             try:
@@ -394,33 +421,38 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
                     # Select only valid entries for CTC loss
                     active_log_probs = log_probs[:, valid_samples_mask, :]
                     active_labels = labels_on_device[valid_samples_mask]
-                    active_input_lengths = input_lengths[valid_samples_mask] # All input_lengths are seq_len
+                    # Ensure input_lengths corresponds to the selected samples for B_active
+                    active_input_lengths = input_lengths[valid_samples_mask] 
                     active_label_lengths = clamped_label_lengths[valid_samples_mask]
 
                     # Guard against label_length > input_length for selected active samples,
                     # though clamping label_lengths to seq_len should largely prevent this.
-                    # For safety, ensure all active_label_lengths <= active_input_lengths
+                    # This check might be redundant if clamping is perfect.
                     mask_len_ok = active_label_lengths <= active_input_lengths
                     if not torch.all(mask_len_ok):
-                        # This indicates an issue, but for robustness, filter/adjust
-                        logger.warning(f"Found {torch.sum(~mask_len_ok)} samples where label_length > input_length after initial clamping. Filtering these for CTC.")
+                        logger.warning(f"Found {torch.sum(~mask_len_ok)} samples where label_length > input_length after initial clamping and masking. Filtering these for CTC.")
                         active_log_probs = active_log_probs[:, mask_len_ok, :]
                         active_labels = active_labels[mask_len_ok]
                         active_input_lengths = active_input_lengths[mask_len_ok]
                         active_label_lengths = active_label_lengths[mask_len_ok]
                     
-                    if active_labels.numel() > 0: # If any samples remain after filtering
-                        calculated_ctc_loss = ctc_loss_fn(
-                            active_log_probs,
-                            active_labels,
-                            active_input_lengths,
-                            active_label_lengths
-                        )
-                        if not (torch.isnan(calculated_ctc_loss) or torch.isinf(calculated_ctc_loss)):
-                            ctc_loss_component = calculated_ctc_loss
-                        else:
-                            logger.warning("CTC loss resulted in NaN or Inf. Using 0.0 for this component.")
+                    if active_labels.numel() > 0 and active_log_probs.numel() > 0 : # If any samples remain after filtering
+                        # Further check: if log_probs themselves are NaN/Inf, ctc_loss_fn will also be.
+                        if torch.isnan(active_log_probs).any() or torch.isinf(active_log_probs).any():
+                            logger.warning("Log_probs for CTC loss contained NaN or Inf. Skipping CTC calculation for this batch.")
                             # ctc_loss_component remains 0.0 with requires_grad=True
+                        else:
+                            calculated_ctc_loss = ctc_loss_fn(
+                                active_log_probs,
+                                active_labels,
+                                active_input_lengths,
+                                active_label_lengths
+                            )
+                            if not (torch.isnan(calculated_ctc_loss) or torch.isinf(calculated_ctc_loss)):
+                                ctc_loss_component = calculated_ctc_loss
+                            else:
+                                logger.warning("CTC loss resulted in NaN or Inf. Using 0.0 for this component.")
+                                # ctc_loss_component remains 0.0 with requires_grad=True
                 # If no valid samples, ctc_loss_component remains 0.0 with requires_grad=True
             except Exception as e:
                 logger.error(f"CTC loss calculation error: {e}", exc_info=True)
@@ -429,26 +461,36 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
             # B. Calculate Compatibility Regularization Loss
             if hasattr(self, 'character_diacritic_compatibility') and \
                self.character_diacritic_compatibility is not None and \
-               self.config.use_character_diacritic_compatibility: # Check the config flag too
+               self.config.use_character_diacritic_compatibility: 
                 
                 compat_matrix = self.character_diacritic_compatibility.compatibility_matrix
                 
-                # 1. Encourage mean to be slightly negative (e.g., -0.1)
-                mean_val = compat_matrix.mean()
-                target_mean = torch.tensor(-0.1, device=mean_val.device)
-                loss_mean_reg = F.mse_loss(mean_val, target_mean)
-                
-                # 2. Encourage variance (e.g., target variance of 1.0)
-                # Use unbiased=False for consistency with the original calculation if it was ((X - mu)^2).mean()
-                variance_val = torch.var(compat_matrix, unbiased=False) 
-                target_variance = torch.tensor(1.0, device=variance_val.device)
-                loss_var_reg = F.mse_loss(variance_val, target_variance)
-                
-                # Combine regularization terms with a small weight
-                reg_loss_component = 0.001 * (loss_mean_reg + loss_var_reg)
+                if torch.isnan(compat_matrix).any() or torch.isinf(compat_matrix).any():
+                    logger.warning("Compatibility matrix contains NaN/Inf. Skipping regularization loss calculation.")
+                    reg_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True)
+                else:
+                    mean_val = compat_matrix.mean()
+                    target_mean = torch.tensor(-0.1, device=mean_val.device)
+                    loss_mean_reg = F.mse_loss(mean_val, target_mean)
+                    
+                    variance_val = torch.var(compat_matrix, unbiased=False) 
+                    target_variance = torch.tensor(1.0, device=variance_val.device)
+                    loss_var_reg = F.mse_loss(variance_val, target_variance)
+                    
+                    current_reg_loss = 0.001 * (loss_mean_reg + loss_var_reg)
+                    if not (torch.isnan(current_reg_loss) or torch.isinf(current_reg_loss)):
+                        reg_loss_component = current_reg_loss
+                    else:
+                        logger.warning("Regularization loss resulted in NaN or Inf. Using 0.0 for this component.")
+                        reg_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True)
             
             # C. Combine losses
-            loss = ctc_loss_component + reg_loss_component
+            # Ensure loss doesn't become NaN if one component is NaN and the other is 0.0 with requires_grad=True
+            if torch.isnan(ctc_loss_component) or torch.isnan(reg_loss_component):
+                logger.error(f"NaN detected in loss components before summation! CTC: {ctc_loss_component}, Reg: {reg_loss_component}. Setting total loss to a fresh 0.0 tensor to prevent propagation.")
+                loss = torch.tensor(0.0, device=current_device, requires_grad=True) # Fallback to prevent NaN propagation
+            else:
+                loss = ctc_loss_component + reg_loss_component
         
         # Populate output dictionary
         output_dict = {
@@ -524,25 +566,25 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
             vision_config_data = loaded_config.vision_encoder_config
             try: # Try to get specific config class
                 from transformers import AutoConfig
-                vision_model_type = vision_config_data.get("model_type")
-                if not vision_model_type: # Fallback if model_type not in dict
-                     base_name = loaded_config.vision_encoder_name.split('/')[-1]
-                     # Simple guess, e.g., "vit", "deit" from "google/vit-base-patch16-224"
-                     vision_model_type = base_name.split('-')[0] if '-' in base_name else base_name
-                
-                # Hacky: TrOCR uses ViT. If vision_encoder_name suggests TrOCR, use ViTConfig
-                if "trocr" in loaded_config.vision_encoder_name.lower():
+                # Use vision_encoder_name from the config to get a hint for AutoConfig
+                # Default to vision_encoder_name itself if model_type isn't in vision_config_data
+                vision_model_identifier = vision_config_data.get("model_type", loaded_config.vision_encoder_name)
+
+                if "trocr" in loaded_config.vision_encoder_name.lower() and "vit" not in vision_model_identifier.lower() : # TrOCR special case
                     from transformers import ViTConfig
                     vision_config_obj = ViTConfig(**vision_config_data)
+                    logger.info("Using ViTConfig for TrOCR-like model based on vision_encoder_name.")
                 else:
-                    vision_config_class = AutoConfig.for_model(vision_model_type)._model_config_class
-                    vision_config_obj = vision_config_class(**vision_config_data)
+                    # Attempt to get the specific config class using AutoConfig
+                    # This relies on 'model_type' in vision_config_data or vision_encoder_name being informative
+                    specific_vision_config = AutoConfig.from_pretrained(vision_model_identifier, trust_remote_code=True)
+                    vision_config_obj = specific_vision_config.__class__(**vision_config_data)
 
                 loaded_config.vision_encoder_config = vision_config_obj
                 logger.info(f"Converted vision_encoder_config dict to {vision_config_obj.__class__.__name__} object.")
             except Exception as e_conf:
-                logger.warning(f"Could not auto-detect specific vision config type: {e_conf}. Using PretrainedConfig as base.")
-                base_vision_conf = PretrainedConfig()
+                logger.warning(f"Could not auto-detect specific vision config type for '{vision_model_identifier}': {e_conf}. Using PretrainedConfig as base.")
+                base_vision_conf = PretrainedConfig() # Fallback
                 for k_vc, v_vc in vision_config_data.items(): setattr(base_vision_conf, k_vc, v_vc)
                 loaded_config.vision_encoder_config = base_vision_conf
         

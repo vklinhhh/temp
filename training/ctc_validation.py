@@ -56,17 +56,41 @@ def compute_ctc_validation_metrics(model, val_loader, device, ctc_decoder):
 
                 # --- Calculate Loss ---
                 log_probs = logits.log_softmax(2).permute(1, 0, 2) # T, B, C
-                time_steps = log_probs.size(0)
+                time_steps = log_probs.size(0) # This is T (model's output sequence length)
                 input_lengths = torch.full((current_batch_size,), time_steps, dtype=torch.long, device='cpu') # CPU for loss fn
                 labels_cpu = labels.cpu()
                 label_lengths_cpu = label_lengths.cpu()
 
                 # Clamp lengths
-                input_lengths_clamped = torch.clamp(input_lengths, max=time_steps)
-                label_lengths_clamped = torch.clamp(label_lengths_cpu, max=labels_cpu.size(1))
+                input_lengths_clamped = torch.clamp(input_lengths, min=0, max=time_steps)
+                # First, clamp label_lengths to the actual padded dimension of labels_cpu
+                label_lengths_clamped_intermediate = torch.clamp(label_lengths_cpu, min=0, max=labels_cpu.size(1))
+                # Then, clamp against the model's output sequence length (time_steps)
+                label_lengths_clamped = torch.clamp(label_lengths_clamped_intermediate, min=0, max=time_steps)
+                
+                # Filter out samples where label_length is 0 after clamping, as CTCLoss might error or give inf
+                valid_mask = label_lengths_clamped > 0
+                if torch.any(valid_mask):
+                    active_log_probs = log_probs[:, valid_mask, :]
+                    active_labels_cpu = labels_cpu[valid_mask]
+                    active_input_lengths_clamped = input_lengths_clamped[valid_mask]
+                    active_label_lengths_clamped = label_lengths_clamped[valid_mask]
 
-                loss = ctc_loss_fn(log_probs, labels_cpu, input_lengths_clamped, label_lengths_clamped)
-                total_val_loss += loss.item() # Accumulate sum loss
+                    # Additional check if log_probs are NaN/Inf before loss calculation
+                    if torch.isnan(active_log_probs).any() or torch.isinf(active_log_probs).any():
+                        logger.warning(f"Validation batch {batch_idx}: Log_probs contained NaN/Inf. Skipping loss calculation for this batch.")
+                        loss = torch.tensor(0.0) # Assign zero loss if logits are bad
+                    else:
+                        loss = ctc_loss_fn(active_log_probs.cpu(), # Ensure log_probs on CPU for loss_fn with CPU targets
+                                           active_labels_cpu, 
+                                           active_input_lengths_clamped, 
+                                           active_label_lengths_clamped)
+                        if torch.isnan(loss) or torch.isinf(loss):
+                            logger.warning(f"Validation CTC loss for batch {batch_idx} is NaN/Inf. Clamped Input Lens: {active_input_lengths_clamped.tolist()}, Clamped Label Lens: {active_label_lengths_clamped.tolist()}. Setting batch loss to 0.")
+                            loss = torch.tensor(0.0) # Reset loss to 0 if it's NaN/Inf
+                    total_val_loss += loss.item() # Accumulate sum loss
+                else: # No valid samples in batch
+                    loss = torch.tensor(0.0) # No loss if no valid samples
 
                 # --- Decode Predictions ---
                 # Use the provided ctc_decoder (e.g., greedy)
@@ -87,14 +111,14 @@ def compute_ctc_validation_metrics(model, val_loader, device, ctc_decoder):
                     logged_samples_count += num_to_log
 
 
-                batch_count += 1
+                batch_count += 1 # Only increment if batch was processed for loss
 
             except Exception as batch_e:
                 logger.error(f"Error processing validation batch {batch_idx}: {batch_e}", exc_info=True)
                 # Log shapes on error for debugging
                 logger.error(f"  Logits shape: {logits.shape if 'logits' in locals() else 'N/A'}")
-                logger.error(f"  Labels shape: {labels.shape}")
-                logger.error(f"  Label lengths: {label_lengths.tolist()}")
+                logger.error(f"  Labels shape: {labels.shape if 'labels' in locals() else 'N/A'}")
+                logger.error(f"  Label lengths: {label_lengths.tolist() if 'label_lengths' in locals() else 'N/A'}")
                 continue # Skip batch on error
 
     # --- End of Validation Loop ---
@@ -102,7 +126,11 @@ def compute_ctc_validation_metrics(model, val_loader, device, ctc_decoder):
 
     # --- Calculate Final Metrics ---
     # Average Loss: Divide total sum loss by total number of samples
-    avg_val_loss = total_val_loss / len(all_gts_strings) if all_gts_strings else 0.0
+    num_samples_for_loss_avg = len(all_gts_strings) # Or batch_count * avg_batch_size if more precise needed
+    if val_loader.dataset: num_samples_for_loss_avg = len(val_loader.dataset) # Best effort to get total samples
+
+    avg_val_loss = total_val_loss / num_samples_for_loss_avg if num_samples_for_loss_avg > 0 else 0.0
+
 
     # Calculate Corpus CER and WER using editdistance
     total_edit_distance_char = 0
@@ -133,7 +161,7 @@ def compute_ctc_validation_metrics(model, val_loader, device, ctc_decoder):
 
     # Log final results
     logger.info(f"Validation Results: Loss={avg_val_loss:.4f}, CER={val_cer:.4f}, WER={val_wer:.4f}")
-    logger.info(f"(Based on {len(all_gts_strings)} samples)")
+    logger.info(f"(Based on {len(all_gts_strings)} samples for CER/WER, {num_samples_for_loss_avg} for loss estimation)")
 
     # Return metrics dictionary
     results = {
