@@ -38,7 +38,7 @@ def log_compatibility_matrix(model, epoch, step, output_dir, log_interval=1000):
     diac_vocab = compat_module.diacritic_vocab if hasattr(compat_module, 'diacritic_vocab') else None
     
     # Save raw matrix data for later analysis
-    np.save(os.path.join(viz_dir, f"compat_matrix_e{epoch}_s{step}.npy"), compat_matrix.numpy())
+    # np.save(os.path.join(viz_dir, f"compat_matrix_e{epoch}_s{step}.npy"), compat_matrix.numpy())
     
     # Generate and save visualization
     visualize_compatibility_matrix(
