@@ -50,6 +50,107 @@ DIACRITIC_VOCAB_HIER = [
     'breve_hook', 'breve_dot', 'horn_grave', 'horn_acute', 'horn_tilde', 'horn_hook', 'horn_dot',
 ]
 
+def freeze_model_layers(model, num_transformer_layers_to_tune=3, tune_diacritic_enhancements=True):
+    logger.info("--- Applying Layer Freezing ---")
+
+    # 1. Freeze the entire vision encoder
+    logger.info("Freezing: Vision Encoder")
+    for param in model.vision_encoder.parameters():
+        param.requires_grad = False
+
+    # 2. Freeze fusion layers
+    if model.dynamic_fusion:
+        logger.info("Freezing: Dynamic Fusion")
+        for param in model.dynamic_fusion.parameters():
+            param.requires_grad = False
+    else: # Static fusion parts
+        if model.fusion_projection:
+            logger.info("Freezing: Fusion Projection")
+            for param in model.fusion_projection.parameters():
+                param.requires_grad = False
+        if model.pre_fusion_projections:
+            logger.info("Freezing: Pre-Fusion Projections")
+            for param in model.pre_fusion_projections.parameters():
+                param.requires_grad = False
+        if model.fusion_bilinear:
+            logger.info("Freezing: Fusion Bilinear")
+            for param in model.fusion_bilinear.parameters():
+                param.requires_grad = False
+        if model.post_static_fusion_norm: # From previous fix
+            logger.info("Freezing: Post Static Fusion Norm")
+            for param in model.post_static_fusion_norm.parameters():
+                param.requires_grad = False
+
+
+    # 3. Freeze feature enhancer (if exists)
+    if model.feature_enhancer:
+        logger.info("Freezing: Feature Enhancer")
+        for param in model.feature_enhancer.parameters():
+            param.requires_grad = False
+
+    # 4. Freeze positional encoder
+    if model.pos_encoder: # Check as it could be nn.Identity
+        logger.info("Freezing: Positional Encoder")
+        for param in model.pos_encoder.parameters(): # nn.Identity has no params, this won't error
+            param.requires_grad = False
+
+    # 5. Freeze early Transformer encoder layers
+    total_transformer_layers = len(model.transformer_encoder.layers)
+    num_layers_to_freeze = total_transformer_layers - num_transformer_layers_to_tune
+
+    if num_layers_to_freeze > 0:
+        logger.info(f"Freezing: First {num_layers_to_freeze} Transformer Encoder Layers")
+        for i in range(num_layers_to_freeze):
+            for param in model.transformer_encoder.layers[i].parameters():
+                param.requires_grad = False
+    
+    logger.info(f"Tuning: Last {num_transformer_layers_to_tune} Transformer Encoder Layers")
+    for i in range(num_layers_to_freeze, total_transformer_layers):
+        for param in model.transformer_encoder.layers[i].parameters():
+            param.requires_grad = True # Ensure these are tunable
+
+    # 6. Ensure final norm of transformer, shared layer, and classifiers are tunable
+    logger.info("Ensuring tuneable: Transformer final norm, Shared Layer, Classifiers")
+    if model.transformer_encoder.norm:
+        for param in model.transformer_encoder.norm.parameters():
+            param.requires_grad = True
+    for param in model.shared_layer.parameters(): # nn.Identity has no params
+        param.requires_grad = True
+    for param in model.base_classifier.parameters():
+        param.requires_grad = True
+    for param in model.diacritic_classifier.parameters():
+        param.requires_grad = True
+    if model.config.conditioning_method == 'concat_proj' and model.diacritic_condition_proj:
+        for param in model.diacritic_condition_proj.parameters():
+            param.requires_grad = True
+    elif model.config.conditioning_method == 'gate' and model.diacritic_gate:
+        for param in model.diacritic_gate.parameters():
+            param.requires_grad = True
+    for param in model.final_classifier.parameters():
+        param.requires_grad = True
+
+    # 7. Handle diacritic enhancement modules based on tune_diacritic_enhancements
+    if model.visual_diacritic_attention:
+        logger.info(f"{'Tuning' if tune_diacritic_enhancements else 'Freezing'}: Visual Diacritic Attention")
+        for param in model.visual_diacritic_attention.parameters():
+            param.requires_grad = tune_diacritic_enhancements
+            
+    if model.character_diacritic_compatibility:
+        logger.info(f"{'Tuning' if tune_diacritic_enhancements else 'Freezing'}: Character Diacritic Compatibility (Matrix always tuned if module active)")
+        # The compatibility_matrix itself should almost always be tuned if the module is active.
+        # Other parts of the module (like a predictor) could follow tune_diacritic_enhancements.
+        model.character_diacritic_compatibility.compatibility_matrix.requires_grad = True
+        if hasattr(model.character_diacritic_compatibility, 'compatibility_predictor'):
+             for param in model.character_diacritic_compatibility.compatibility_predictor.parameters():
+                param.requires_grad = tune_diacritic_enhancements
+
+
+    if model.few_shot_diacritic_adapter:
+        logger.info(f"{'Tuning' if tune_diacritic_enhancements else 'Freezing'}: Few Shot Diacritic Adapter")
+        for param in model.few_shot_diacritic_adapter.parameters():
+            param.requires_grad = tune_diacritic_enhancements
+            
+    logger.info("--- Layer Freezing Complete ---")
 
 def main():
     parser = argparse.ArgumentParser(description='Train Hierarchical Multi-Scale CTC Vietnamese OCR model')
@@ -120,6 +221,10 @@ def main():
     # parser.add_argument('--ignore_scaler_state_on_resume', action='store_true') # Removed as a primary solution
     parser.add_argument('--log_compatibility_interval', type=int, default=5000, 
                    help='How often to log compatibility matrix (steps)')
+    parser.add_argument('--freeze_except_last_n_transformer_layers', type=int, default=0, 
+                        help='Number of final Transformer encoder layers to TUNE. 0 means tune all. Vision encoder and earlier custom layers will be frozen if > 0.')
+    parser.add_argument('--freeze_diacritic_enhancements', action='store_true',
+                        help='If freezing, also freeze diacritic enhancement modules (VDA, FSA). Compatibility matrix is usually still tuned.')
     args = parser.parse_args()
 
     # --- Setup ---
@@ -236,6 +341,15 @@ def main():
     except Exception as model_init_e:
         logger.error(f"FATAL: Model init failed: {model_init_e}", exc_info=True)
         return 1
+    # --- <<<< ADD FREEZING LOGIC HERE >>>> ---
+    if args.freeze_except_last_n_transformer_layers > 0 : # Add this arg to parser
+        freeze_model_layers(
+            model,
+            num_transformer_layers_to_tune=args.freeze_except_last_n_transformer_layers,
+            tune_diacritic_enhancements=not args.freeze_diacritic_enhancements # Add this arg
+        )
+    # --- <<<< END FREEZING LOGIC >>>> ---
+    
     if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
         # Force reinitialize the compatibility matrix
         logger.info("Forcefully reinitializing compatibility matrix...")
