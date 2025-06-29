@@ -22,7 +22,7 @@ from utils.schedulers import CosineWarmupScheduler
 # from utils.schedulers import CosineWarmupWithPlateauScheduler # Keep if you have this implemented and want to use it
 from utils.optimizers import create_optimizer
 from utils.ctc_utils import build_ctc_vocab, build_combined_vietnamese_charset
-
+from tests.test_compatibility_matrix import test_compatibility_matrix_behavior
 # --- Logging Setup ---
 logging.basicConfig(
     level=logging.INFO,
@@ -44,7 +44,7 @@ BASE_CHAR_VOCAB_HIER = [
     '\\', '@', '#', '$', '%', '^', '&', '*', '+', '=', '<', '>', '|',
 ]
 DIACRITIC_VOCAB_HIER = [
-    '<blank>', 'no_diacritic', '<unk>', 'acute', 'grave', 'hook', 'tilde', 'dot', 'circumflex',
+    'no_diacritic', 'acute', 'grave', 'hook', 'tilde', 'dot', 'circumflex',
     'breve', 'horn', 'stroke', 'circumflex_grave', 'circumflex_acute', 'circumflex_tilde',
     'circumflex_hook', 'circumflex_dot', 'breve_grave', 'breve_acute', 'breve_tilde',
     'breve_hook', 'breve_dot', 'horn_grave', 'horn_acute', 'horn_tilde', 'horn_hook', 'horn_dot',
@@ -152,11 +152,61 @@ def freeze_model_layers(model, num_transformer_layers_to_tune=3, tune_diacritic_
             
     logger.info("--- Layer Freezing Complete ---")
 
+
+
+def test_corrected_compatibility_matrix(model):
+    """Test that the corrected compatibility matrix works properly"""
+    
+    if not hasattr(model, 'character_diacritic_compatibility') or model.character_diacritic_compatibility is None:
+        logger.warning("❌ No compatibility matrix found")
+        return
+    
+    logger.info("🧪 Testing Corrected Compatibility Matrix:")
+    
+    # Test cases: vowels should allow diacritics, consonants should not
+    test_cases = [
+        {'char': 'a', 'type': 'vowel', 'should_allow_acute': True},
+        {'char': 'e', 'type': 'vowel', 'should_allow_acute': True},
+        {'char': 'b', 'type': 'consonant', 'should_allow_acute': False},
+        {'char': 'g', 'type': 'consonant', 'should_allow_acute': False},
+        {'char': 'm', 'type': 'consonant', 'should_allow_acute': False},
+    ]
+    
+    dummy_features = torch.randn(1, 1, model.config.shared_hidden_size).to(model.device)
+    
+    for test_case in test_cases:
+        char = test_case['char']
+        if char not in model.base_char_vocab:
+            continue
+            
+        char_idx = model.base_char_vocab.index(char)
+        
+        # Create one-hot base prediction
+        base_logits = torch.zeros(1, 1, len(model.base_char_vocab)).to(model.device)
+        base_logits[0, 0, char_idx] = 10.0
+        
+        # Get compatibility bias
+        compat_bias, _ = model.character_diacritic_compatibility(base_logits, dummy_features)
+        
+        # Check acute bias
+        if 'acute' in model.diacritic_vocab:
+            acute_idx = model.diacritic_vocab.index('acute')
+            acute_bias = compat_bias[0, 0, acute_idx].item()
+            
+            expected_positive = test_case['should_allow_acute']
+            actual_positive = acute_bias > 0
+            
+            status = "✅" if (expected_positive == actual_positive) else "❌"
+            logger.info(f"  {status} '{char}' ({test_case['type']}) + acute: {acute_bias:.3f} "
+                  f"(expected {'positive' if expected_positive else 'negative'})")
+
+
+
 def main():
     parser = argparse.ArgumentParser(description='Train Hierarchical Multi-Scale CTC Vietnamese OCR model')
 
     # --- Arguments ---
-    parser.add_argument('--dataset_name', type=str, default='vklinhhh/vietnamese_character_diacritic_cwl_v2', help='HF dataset (image, label, base_character, diacritic_type)')
+    parser.add_argument('--dataset_name', type=str, default='vklinhhh/vnhwt_opt_3', help='HF dataset (image, label, base_character, diacritic_type)')
     parser.add_argument('--vision_encoder', type=str, default='microsoft/trocr-base-handwritten', help='Vision encoder')
     parser.add_argument('--output_dir', type=str, default='outputs/hier_ctc_multiscale_model', help='Output directory')
     parser.add_argument('--combined_char_vocab_json', type=str, default=None, help='Path to JSON list of FINAL combined characters. If None, uses default generator.')
@@ -209,7 +259,7 @@ def main():
     parser.add_argument('--log_interval', type=int, default=5000)
     parser.add_argument('--eval_steps', type=int, default=None)
     parser.add_argument('--use_amp', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=16) # Default from your previous script
+    parser.add_argument('--num_workers', type=int, default=16) 
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--discriminative_lr', action='store_true')
     parser.add_argument('--encoder_lr_factor', type=float, default=0.1)
@@ -225,6 +275,21 @@ def main():
                         help='Number of final Transformer encoder layers to TUNE. 0 means tune all. Vision encoder and earlier custom layers will be frozen if > 0.')
     parser.add_argument('--freeze_diacritic_enhancements', action='store_true',
                         help='If freezing, also freeze diacritic enhancement modules (VDA, FSA). Compatibility matrix is usually still tuned.')
+    parser.add_argument('--hierarchical_mode', type=str, default='enhanced_single',
+                        choices=['parallel', 'sequential', 'multitask', 'enhanced_single'],
+                        help='Hierarchical processing mode: '
+                             'parallel (original), sequential (true hierarchy), '
+                             'multitask (weighted multi-task), enhanced_single (apply enhancements to final only)')
+    
+    # NEW: Multi-task loss weights
+    parser.add_argument('--multitask_final_weight', type=float, default=1.0,
+                        help='Weight for final classifier loss in multitask mode')
+    parser.add_argument('--multitask_base_weight', type=float, default=0.1,
+                        help='Weight for base classifier loss in multitask mode')
+    parser.add_argument('--multitask_diacritic_weight', type=float, default=0.1,
+                        help='Weight for diacritic classifier loss in multitask mode')
+    parser.add_argument('--no_middle_diacritic_conditioning', action='store_true',
+                       help='Ablation: Skip middle diacritic conditioning in sequential mode')
     args = parser.parse_args()
 
     # --- Setup ---
@@ -290,6 +355,12 @@ def main():
 
 
     # --- Initialize Model ---
+    # Prepare multitask loss weights
+    multitask_loss_weights = [
+        args.multitask_final_weight,
+        args.multitask_base_weight,
+        args.multitask_diacritic_weight
+    ]
     try:
         logger.info("Initializing HierarchicalCtcMultiScaleOcrModel configuration...")
         model_config = HierarchicalCtcOcrConfig(
@@ -299,6 +370,9 @@ def main():
             combined_char_vocab=combined_vocab,
             vision_encoder_layer_indices=fusion_layer_indices,
             feature_fusion_method=args.fusion_method,
+            hierarchical_mode=args.hierarchical_mode,
+            multitask_loss_weights=multitask_loss_weights,
+            use_middle_diacritic_conditioning=not args.no_middle_diacritic_conditioning, 
             # --- NEW: Dynamic Fusion params ---
             use_dynamic_fusion=args.use_dynamic_fusion,
             use_feature_enhancer=args.use_feature_enhancer,
@@ -319,9 +393,14 @@ def main():
             use_visual_diacritic_attention=args.use_visual_diacritic_attention,
             use_character_diacritic_compatibility=args.use_character_diacritic_compatibility,
             use_few_shot_diacritic_adapter=args.use_few_shot_diacritic_adapter,
-            num_few_shot_prototypes=args.num_few_shot_prototypes
+            num_few_shot_prototypes=args.num_few_shot_prototypes,
+            
         )
-
+        logger.info(f"Using hierarchical mode: {args.hierarchical_mode}")
+        if args.hierarchical_mode == 'multitask':
+            logger.info(f"Multitask loss weights: Final={args.multitask_final_weight}, "
+                    f"Base={args.multitask_base_weight}, Diacritic={args.multitask_diacritic_weight}")
+        
         model_load_path = args.load_weights_from if args.load_weights_from else args.vision_encoder
         logger.info(f"Instantiating/Loading model from: {model_load_path}")
         init_kwargs = model_config.to_dict()
@@ -337,6 +416,17 @@ def main():
         
         if args.use_feature_enhancer:
             logger.info("Using Local Feature Enhancer for diacritical marks")
+        # # Enable detailed compatibility logging
+
+        if args.hierarchical_mode == 'sequential' and args.use_character_diacritic_compatibility:
+            logger.info("🔧 Testing compatibility matrix after initialization...")
+            test_corrected_compatibility_matrix(model)
+        if args.hierarchical_mode == 'sequential':
+            if args.no_middle_diacritic_conditioning:
+                logger.info("🔬 ABLATION: Sequential mode WITHOUT middle diacritic conditioning")
+            else:
+                logger.info("📊 BASELINE: Sequential mode WITH middle diacritic conditioning")
+
 
     except Exception as model_init_e:
         logger.error(f"FATAL: Model init failed: {model_init_e}", exc_info=True)
@@ -350,17 +440,17 @@ def main():
         )
     # --- <<<< END FREEZING LOGIC >>>> ---
     
-    if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
-        # Force reinitialize the compatibility matrix
-        logger.info("Forcefully reinitializing compatibility matrix...")
-        with torch.no_grad():
-            # Initialize with small random values
-            model.character_diacritic_compatibility.compatibility_matrix.data = torch.randn_like(
-                model.character_diacritic_compatibility.compatibility_matrix
-            ) * 0.1
+    # if hasattr(model, 'character_diacritic_compatibility') and model.character_diacritic_compatibility is not None:
+    #     # Force reinitialize the compatibility matrix
+    #     logger.info("Forcefully reinitializing compatibility matrix...")
+    #     with torch.no_grad():
+    #         # Initialize with small random values
+    #         model.character_diacritic_compatibility.compatibility_matrix.data = torch.randn_like(
+    #             model.character_diacritic_compatibility.compatibility_matrix
+    #         ) * 0.1
             
-            # Make sure requires_grad is True
-            model.character_diacritic_compatibility.compatibility_matrix.requires_grad_(True)
+    #         # Make sure requires_grad is True
+    #         model.character_diacritic_compatibility.compatibility_matrix.requires_grad_(True)
     # --- Create Datasets ---
     try:
         logger.info('Creating CTC dataset wrappers (using combined vocab)...')

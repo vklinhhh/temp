@@ -13,7 +13,6 @@ import os
 import json
 import logging
 import math
-# Assuming these are in the same directory or accessible via PYTHONPATH
 from .diacritic_attention import (
     VisualDiacriticAttention,
     CharacterDiacriticCompatibility,
@@ -23,7 +22,7 @@ from .dynamic_fusion import (
     DynamicMultiScaleFusion,
     LocalFeatureEnhancer
 )
-
+from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # --- Configuration Class (HierarchicalCtcOcrConfig) ---
@@ -34,16 +33,19 @@ class HierarchicalCtcOcrConfig(PretrainedConfig):
         self,
         vision_encoder_name='microsoft/trocr-base-handwritten',
         base_char_vocab=None, diacritic_vocab=None, combined_char_vocab=None,
-        vision_encoder_layer_indices=[-1, -4], feature_fusion_method="concat_proj",
+        vision_encoder_layer_indices=[-1, -4, -7], feature_fusion_method="concat_proj",
         use_dynamic_fusion=False, use_feature_enhancer=False,
         num_transformer_encoder_layers=4, transformer_d_model=512,
         transformer_nhead=8, transformer_dim_feedforward=2048,
         transformer_dropout=0.1, positional_encoding_type="sinusoidal_1d",
         max_seq_len_for_pos_enc=768, shared_hidden_size=512,
         num_shared_layers=1, conditioning_method="concat_proj",
-        classifier_dropout=0.1, blank_idx=0, vision_encoder_config=None,
+        classifier_dropout=0.3, blank_idx=0, vision_encoder_config=None,
         use_visual_diacritic_attention=False, use_character_diacritic_compatibility=False,
         use_few_shot_diacritic_adapter=False, num_few_shot_prototypes=10,
+        hierarchical_mode="sequential", # "parallel", "sequential", "multitask", "enhanced_single"
+        multitask_loss_weights=None, #weights for multitask losses
+        use_middle_diacritic_conditioning=True, 
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -77,6 +79,17 @@ class HierarchicalCtcOcrConfig(PretrainedConfig):
         self.num_few_shot_prototypes = num_few_shot_prototypes
         if not self.combined_char_vocab:
             logger.warning("Combined character vocabulary is empty during config init.")
+        self.hierarchical_mode = hierarchical_mode
+        # Default multitask loss weights [final_weight, base_weight, diacritic_weight]
+        if multitask_loss_weights is None:
+            self.multitask_loss_weights = [1.0, 0.1, 0.1]
+        else:
+            self.multitask_loss_weights = multitask_loss_weights
+        self.use_middle_diacritic_conditioning = use_middle_diacritic_conditioning
+        # Validate hierarchical mode
+        valid_modes = ["parallel", "sequential", "multitask", "enhanced_single"]
+        if self.hierarchical_mode not in valid_modes:
+            raise ValueError(f"Invalid hierarchical_mode: {self.hierarchical_mode}. Must be one of {valid_modes}")
 
 # --- Positional Encoding Classes ---
 class SinusoidalPositionalEncoding1D(nn.Module):
@@ -209,30 +222,33 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         logger.info(f"Shared Layer(s): {config.num_shared_layers}, Output Dim: {shared_output_size}")
 
         # --- Hierarchical Heads ---
-        self.base_classifier = nn.Linear(shared_output_size, config.base_char_vocab_size)
-        logger.info(f"Base Classifier (In: {shared_output_size}, Out: {config.base_char_vocab_size})")
+        # self.base_classifier = nn.Linear(shared_output_size, config.base_char_vocab_size)
+        # logger.info(f"Base Classifier (In: {shared_output_size}, Out: {config.base_char_vocab_size})")
 
-        self.diacritic_gate = None; self.diacritic_condition_proj = None
-        diacritic_head_input_size = shared_output_size
-        if config.conditioning_method == 'concat_proj':
-            self.diacritic_condition_proj = nn.Sequential(nn.Linear(shared_output_size + config.base_char_vocab_size, shared_output_size), nn.LayerNorm(shared_output_size), nn.GELU(), nn.Dropout(config.classifier_dropout))
-            logger.info(f"'concat_proj' conditioning for diacritic head -> {shared_output_size} dim.")
-        elif config.conditioning_method == 'gate':
-            self.diacritic_gate = nn.Sequential(nn.Linear(shared_output_size + config.base_char_vocab_size, shared_output_size), nn.Sigmoid())
-            logger.info(f"'gate' conditioning for diacritic head -> {shared_output_size} dim.")
-        else: logger.info(f"'none' conditioning for diacritic head -> {shared_output_size} dim.")
+        # self.diacritic_gate = None; self.diacritic_condition_proj = None
+        # diacritic_head_input_size = shared_output_size
+        # if config.conditioning_method == 'concat_proj':
+        #     self.diacritic_condition_proj = nn.Sequential(nn.Linear(shared_output_size + config.base_char_vocab_size, shared_output_size), nn.LayerNorm(shared_output_size), nn.GELU(), nn.Dropout(config.classifier_dropout))
+        #     logger.info(f"'concat_proj' conditioning for diacritic head -> {shared_output_size} dim.")
+        # elif config.conditioning_method == 'gate':
+        #     self.diacritic_gate = nn.Sequential(nn.Linear(shared_output_size + config.base_char_vocab_size, shared_output_size), nn.Sigmoid())
+        #     logger.info(f"'gate' conditioning for diacritic head -> {shared_output_size} dim.")
+        # else: logger.info(f"'none' conditioning for diacritic head -> {shared_output_size} dim.")
 
-        self.visual_diacritic_attention = None; self.character_diacritic_compatibility = None; self.few_shot_diacritic_adapter = None
-        if config.use_visual_diacritic_attention: self.visual_diacritic_attention = VisualDiacriticAttention(diacritic_head_input_size, config.diacritic_vocab_size); logger.info("Visual Diacritic Attn: ON")
-        if config.use_character_diacritic_compatibility: self.character_diacritic_compatibility = CharacterDiacriticCompatibility(config.base_char_vocab_size, config.diacritic_vocab_size, diacritic_head_input_size, self.base_char_vocab, self.diacritic_vocab); logger.info("Char-Diac Compat: ON")
-        if config.use_few_shot_diacritic_adapter: self.few_shot_diacritic_adapter = FewShotDiacriticAdapter(diacritic_head_input_size, config.diacritic_vocab_size, config.num_few_shot_prototypes); logger.info("Few-Shot Adapter: ON")
+        # self.visual_diacritic_attention = None; self.character_diacritic_compatibility = None; self.few_shot_diacritic_adapter = None
+        # if config.use_visual_diacritic_attention: self.visual_diacritic_attention = VisualDiacriticAttention(diacritic_head_input_size, config.diacritic_vocab_size); logger.info("Visual Diacritic Attn: ON")
+        # if config.use_character_diacritic_compatibility: self.character_diacritic_compatibility = CharacterDiacriticCompatibility(config.base_char_vocab_size, config.diacritic_vocab_size, diacritic_head_input_size, self.base_char_vocab, self.diacritic_vocab); logger.info("Char-Diac Compat: ON")
+        # if config.use_few_shot_diacritic_adapter: self.few_shot_diacritic_adapter = FewShotDiacriticAdapter(diacritic_head_input_size, config.diacritic_vocab_size, config.num_few_shot_prototypes); logger.info("Few-Shot Adapter: ON")
 
-        self.diacritic_classifier = nn.Linear(diacritic_head_input_size, config.diacritic_vocab_size)
-        logger.info(f"Diacritic Classifier (In: {diacritic_head_input_size}, Out: {config.diacritic_vocab_size})")
+        # self.diacritic_classifier = nn.Linear(diacritic_head_input_size, config.diacritic_vocab_size)
+        # logger.info(f"Diacritic Classifier (In: {diacritic_head_input_size}, Out: {config.diacritic_vocab_size})")
 
-        self.final_classifier = nn.Linear(shared_output_size, config.combined_char_vocab_size)
-        logger.info(f"Final Combined Classifier (In: {shared_output_size}, Out: {config.combined_char_vocab_size})")
+        # self.final_classifier = nn.Linear(shared_output_size, config.combined_char_vocab_size)
+        # logger.info(f"Final Combined Classifier (In: {shared_output_size}, Out: {config.combined_char_vocab_size})")
 
+        # --- Adaptive Hierarchical Classification Heads ---
+        self._setup_classification_heads(config, shared_output_size)
+        logger.info(f"Adaptive Hierarchical Classification Heads set up with {config.hierarchical_mode} mode.")
         # --- Grad-CAM Hooks ---
         self.activation_hook_handles = []
         self.activations = None
@@ -281,9 +297,140 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         return current_activations, current_gradients
     # --- End Grad-CAM Hook Methods ---
 
+    def _setup_classification_heads(self, config, shared_output_size):
+        """Setup classification heads based on hierarchical mode"""
+        
+        if config.hierarchical_mode == "sequential":
+            self._setup_sequential_heads(config, shared_output_size)
+        elif config.hierarchical_mode == "multitask":
+            self._setup_multitask_heads(config, shared_output_size)
+        elif config.hierarchical_mode == "parallel":
+            self._setup_parallel_heads(config, shared_output_size)
+        else:  # enhanced_single
+            self._setup_enhanced_single_heads(config, shared_output_size)
+
+    def _setup_sequential_heads(self, config, shared_output_size):
+        """Sequential hierarchical: base → diacritic → final"""
+        logger.info("Setting up SEQUENTIAL hierarchical classification heads")
+        
+        # Base classifier
+        self.base_classifier = nn.Linear(shared_output_size, config.base_char_vocab_size)
+        logger.info(f"Base Classifier (In: {shared_output_size}, Out: {config.base_char_vocab_size})")
+
+        # Diacritic classifier with base conditioning
+        diacritic_input_size = shared_output_size + config.base_char_vocab_size
+        self.diacritic_fusion = nn.Sequential(
+            nn.Linear(diacritic_input_size, shared_output_size),
+            nn.LayerNorm(shared_output_size),
+            nn.GELU(),
+            nn.Dropout(config.classifier_dropout)
+        )
+        
+        self._setup_diacritic_enhancements(config, shared_output_size)
+        self.diacritic_classifier = nn.Linear(shared_output_size, config.diacritic_vocab_size)
+        logger.info(f"Diacritic Classifier (In: {shared_output_size}, Out: {config.diacritic_vocab_size})")
+
+        # Final classifier with both base and diacritic conditioning
+        final_input_size = shared_output_size + config.base_char_vocab_size + config.diacritic_vocab_size
+        self.final_fusion = nn.Sequential(
+            nn.Linear(final_input_size, shared_output_size),
+            nn.LayerNorm(shared_output_size),
+            nn.GELU(),
+            nn.Dropout(config.classifier_dropout)
+        )
+        self.final_classifier = nn.Linear(shared_output_size, config.combined_char_vocab_size)
+        logger.info(f"Final Classifier (In: {shared_output_size}, Out: {config.combined_char_vocab_size}) - Sequential")
+
+    def _setup_multitask_heads(self, config, shared_output_size):
+        """Multi-task learning: three parallel tasks with shared features"""
+        logger.info("Setting up MULTITASK parallel classification heads")
+        
+        # All three classifiers operate on shared features
+        self.base_classifier = nn.Linear(shared_output_size, config.base_char_vocab_size)
+        logger.info(f"Base Classifier (In: {shared_output_size}, Out: {config.base_char_vocab_size})")
+
+        # Diacritic classifier with optional conditioning
+        if config.conditioning_method != 'none':
+            self._setup_diacritic_conditioning(config, shared_output_size)
+        
+        self._setup_diacritic_enhancements(config, shared_output_size)
+        self.diacritic_classifier = nn.Linear(shared_output_size, config.diacritic_vocab_size)
+        logger.info(f"Diacritic Classifier (In: {shared_output_size}, Out: {config.diacritic_vocab_size})")
+
+        self.final_classifier = nn.Linear(shared_output_size, config.combined_char_vocab_size)
+        logger.info(f"Final Classifier (In: {shared_output_size}, Out: {config.combined_char_vocab_size}) - Multitask")
+
+    def _setup_parallel_heads(self, config, shared_output_size):
+        """Original parallel heads (existing implementation)"""
+        logger.info("Setting up PARALLEL classification heads (original)")
+        
+        # Keep existing implementation
+        self.base_classifier = nn.Linear(shared_output_size, config.base_char_vocab_size)
+        
+        if config.conditioning_method != 'none':
+            self._setup_diacritic_conditioning(config, shared_output_size)
+        
+        self._setup_diacritic_enhancements(config, shared_output_size)
+        self.diacritic_classifier = nn.Linear(shared_output_size, config.diacritic_vocab_size)
+        self.final_classifier = nn.Linear(shared_output_size, config.combined_char_vocab_size)
+
+    def _setup_enhanced_single_heads(self, config, shared_output_size):
+        """Enhanced single task: only final classifier with enhancements"""
+        logger.info("Setting up ENHANCED SINGLE classification head")
+        
+        # Only final classifier, but with enhancements applied directly
+        self.final_classifier = nn.Linear(shared_output_size, config.combined_char_vocab_size)
+        
+        # Setup enhancements to be applied to final classifier
+        self._setup_diacritic_enhancements(config, shared_output_size)
+        
+        # Optional: keep base classifier for compatibility matrix
+        if config.use_character_diacritic_compatibility:
+            self.base_classifier = nn.Linear(shared_output_size, config.base_char_vocab_size)
+            logger.info("Added base classifier for compatibility matrix support")
+
+    def _setup_diacritic_conditioning(self, config, shared_output_size):
+        """Setup diacritic conditioning layers"""
+        if config.conditioning_method == 'concat_proj':
+            self.diacritic_condition_proj = nn.Sequential(
+                nn.Linear(shared_output_size + config.base_char_vocab_size, shared_output_size),
+                nn.LayerNorm(shared_output_size),
+                nn.GELU(),
+                nn.Dropout(config.classifier_dropout)
+            )
+            logger.info("Diacritic conditioning: concat_proj")
+        elif config.conditioning_method == 'gate':
+            self.diacritic_gate = nn.Sequential(
+                nn.Linear(shared_output_size + config.base_char_vocab_size, shared_output_size),
+                nn.Sigmoid()
+            )
+            logger.info("Diacritic conditioning: gate")
+
+    def _setup_diacritic_enhancements(self, config, shared_output_size):
+        """Setup diacritic enhancement modules"""
+        self.visual_diacritic_attention = None
+        self.character_diacritic_compatibility = None
+        self.few_shot_diacritic_adapter = None
+        
+        if config.use_visual_diacritic_attention:
+            self.visual_diacritic_attention = VisualDiacriticAttention(shared_output_size, config.diacritic_vocab_size)
+            logger.info("Visual Diacritic Attention: ON")
+            
+        if config.use_character_diacritic_compatibility:
+            self.character_diacritic_compatibility = CharacterDiacriticCompatibility(
+                config.base_char_vocab_size, config.diacritic_vocab_size, 
+                shared_output_size, self.base_char_vocab, self.diacritic_vocab
+            )
+            logger.info("Character-Diacritic Compatibility: ON")
+            
+        if config.use_few_shot_diacritic_adapter:
+            self.few_shot_diacritic_adapter = FewShotDiacriticAdapter(
+                shared_output_size, config.diacritic_vocab_size, config.num_few_shot_prototypes
+            )
+            logger.info("Few-Shot Diacritic Adapter: ON")
+
     def forward(self, pixel_values, labels=None, label_lengths=None,
-                return_diacritic_attention=False,
-                grad_cam_target_layer_module_name=None):
+                return_diacritic_attention=False, grad_cam_target_layer_module_name=None):
 
         if grad_cam_target_layer_module_name and not pixel_values.requires_grad:
             pixel_values.requires_grad_(True) # Ensure input allows grad flow if needed for CAM
@@ -349,268 +496,953 @@ class HierarchicalCtcTransformerOcrModel(PreTrainedModel):
         transformer_output = self.transformer_encoder(features_with_pos)
         # 6. Shared Layer
         shared_features = self.shared_layer(transformer_output) # `self.activations` set here if "shared_layer" is target
+        # Route to appropriate forward method based on mode
+        if self.config.hierarchical_mode == "sequential":
+            return self._forward_sequential(shared_features, labels, label_lengths, 
+                                          return_diacritic_attention, grad_cam_target_layer_module_name)
+        elif self.config.hierarchical_mode == "multitask":
+            return self._forward_multitask(shared_features, labels, label_lengths,
+                                         return_diacritic_attention, grad_cam_target_layer_module_name)
+        elif self.config.hierarchical_mode == "enhanced_single":
+            return self._forward_enhanced_single(shared_features, labels, label_lengths,
+                                               return_diacritic_attention, grad_cam_target_layer_module_name)
+        else:  # parallel (original)
+            return self._forward_parallel(shared_features, labels, label_lengths,
+                                        return_diacritic_attention, grad_cam_target_layer_module_name)
 
-        # 7. Hierarchical Heads
+    def _forward_sequential(self, shared_features, labels=None, label_lengths=None,
+                           return_diacritic_attention=False, grad_cam_target_layer_module_name=None):
+        """Sequential hierarchical: base → diacritic → final"""
+        
+        # Step 1: Base character prediction
         base_logits = self.base_classifier(shared_features)
-        diacritic_input_features = shared_features
-        if self.config.conditioning_method == 'concat_proj' and self.diacritic_condition_proj:
-            diacritic_input_features = self.diacritic_condition_proj(torch.cat((shared_features, F.softmax(base_logits, dim=-1)), dim=-1))
-        elif self.config.conditioning_method == 'gate' and self.diacritic_gate:
-            diacritic_input_features = shared_features * self.diacritic_gate(torch.cat((shared_features, F.softmax(base_logits, dim=-1)), dim=-1))
+        base_probs = F.softmax(base_logits, dim=-1)
+        # 🔍 DEBUG: Log base predictions
+        if self.training and torch.rand(1).item() < 0.001:  # Log 0.1% of batches
+            self._debug_log_base_predictions(base_logits, base_probs)
+        # Step 2: Diacritic prediction conditioned on base
+        if self.config.use_middle_diacritic_conditioning:
+            # Original: Condition diacritic on base predictions
+            base_enhanced_features = torch.cat([shared_features, base_probs], dim=-1)
+            diacritic_features = self.diacritic_fusion(base_enhanced_features)
+            logger.debug("Using middle diacritic conditioning (baseline)")
+        else:
+            # Ablation: Skip middle conditioning, use shared features directly
+            diacritic_features = shared_features
+            logger.debug("Ablation: Skipping middle diacritic conditioning")
+        # Get raw diacritic logits BEFORE compatibility
+        raw_diacritic_logits = self.diacritic_classifier(diacritic_features)
 
-        standard_diacritic_logits = self.diacritic_classifier(diacritic_input_features)
-        current_diacritic_logits = standard_diacritic_logits
-        vda_raw_output, visual_diacritic_attention_maps = None, None
-        compatibility_matrices = []
+        # Apply diacritic enhancements
+        enhanced_diacritic_logits, attention_maps = self._apply_diacritic_enhancements(
+            diacritic_features, base_logits, return_diacritic_attention
+        )
+        diacritic_probs = F.softmax(enhanced_diacritic_logits, dim=-1)
+        # 🔍 DEBUG: Log compatibility effects
+        if self.training and torch.rand(1).item() < 0.001:
+            self._debug_log_compatibility_effects(
+                base_logits, raw_diacritic_logits, enhanced_diacritic_logits
+            )
+        # Step 3: Final prediction conditioned on both
+        diacritic_probs = F.softmax(enhanced_diacritic_logits, dim=-1)
+        final_enhanced_features = torch.cat([shared_features, base_probs, diacritic_probs], dim=-1)
+        final_features = self.final_fusion(final_enhanced_features)
+        final_logits = self.final_classifier(final_features)
+        
+        # Compute loss
+        loss = None
+        if labels is not None and label_lengths is not None:
+            loss = self._compute_loss(final_logits, base_logits, enhanced_diacritic_logits, 
+                                    labels, label_lengths, mode="sequential")
+        
+        return self._prepare_output(final_logits, base_logits, enhanced_diacritic_logits, loss,
+                                  attention_maps, return_diacritic_attention,
+                                  grad_cam_target_layer_module_name)
+    
+    def _debug_log_base_predictions(self, base_logits, base_probs):
+        """Log top base character predictions"""
+        batch_size = base_logits.shape[0]
+        for b in range(min(2, batch_size)):  # Log first 2 samples
+            for t in range(min(5, base_logits.shape[1])):  # Log first 5 timesteps
+                top_indices = torch.topk(base_probs[b, t], k=3).indices
+                top_chars = [self.base_char_vocab[idx] for idx in top_indices]
+                top_probs = [base_probs[b, t, idx].item() for idx in top_indices]
+                
+                logger.info(f"Batch {b}, Time {t} - Top base predictions: {list(zip(top_chars, top_probs))}")
+
+    def _debug_log_compatibility_effects(self, base_logits, raw_diacritic_logits, enhanced_diacritic_logits):
+        """Log how compatibility matrix affects diacritic predictions"""
+        # Calculate the compatibility bias
+        compatibility_bias = enhanced_diacritic_logits - raw_diacritic_logits
+        
+        batch_size = base_logits.shape[0]
+        for b in range(min(2, batch_size)):
+            for t in range(min(3, base_logits.shape[1])):
+                # Get top base character
+                top_base_idx = torch.argmax(base_logits[b, t]).item()
+                top_base_char = self.base_char_vocab[top_base_idx]
+                
+                # Get diacritic changes
+                bias = compatibility_bias[b, t]
+                top_positive_bias = torch.topk(bias, k=3)
+                top_negative_bias = torch.topk(bias, k=3, largest=False)
+                
+                pos_diacritics = [self.diacritic_vocab[idx] for idx in top_positive_bias.indices]
+                neg_diacritics = [self.diacritic_vocab[idx] for idx in top_negative_bias.indices]
+                
+                logger.info(f"Base '{top_base_char}' → Boosted diacritics: {pos_diacritics}")
+                logger.info(f"Base '{top_base_char}' → Suppressed diacritics: {neg_diacritics}")
+
+    def _forward_multitask(self, shared_features, labels=None, label_lengths=None,
+                          return_diacritic_attention=False, grad_cam_target_layer_module_name=None):
+        """Multi-task learning: three parallel tasks"""
+        
+        # All predictions from shared features
+        base_logits = self.base_classifier(shared_features)
+        
+        # Diacritic prediction with optional conditioning
+        diacritic_input_features = shared_features
+        if self.config.conditioning_method == 'concat_proj' and hasattr(self, 'diacritic_condition_proj'):
+            base_probs = F.softmax(base_logits, dim=-1)
+            diacritic_input_features = self.diacritic_condition_proj(
+                torch.cat([shared_features, base_probs], dim=-1)
+            )
+        elif self.config.conditioning_method == 'gate' and hasattr(self, 'diacritic_gate'):
+            base_probs = F.softmax(base_logits, dim=-1)
+            gate = self.diacritic_gate(torch.cat([shared_features, base_probs], dim=-1))
+            diacritic_input_features = shared_features * gate
+        
+        # Apply diacritic enhancements
+        diacritic_logits, visual_diacritic_attention_maps = self._apply_diacritic_enhancements(
+            diacritic_input_features, base_logits, return_diacritic_attention
+        )
+        
+        # Final prediction
+        final_logits = self.final_classifier(shared_features)
+        
+        # Compute multi-task loss
+        loss = None
+        if labels is not None and label_lengths is not None:
+            loss = self._compute_loss(final_logits, base_logits, diacritic_logits,
+                                    labels, label_lengths, mode="multitask")
+        
+        return self._prepare_output(final_logits, base_logits, diacritic_logits, loss,
+                                  visual_diacritic_attention_maps, return_diacritic_attention,
+                                  grad_cam_target_layer_module_name)
+
+    def _forward_enhanced_single(self, shared_features, labels=None, label_lengths=None,
+                                return_diacritic_attention=False, grad_cam_target_layer_module_name=None):
+        """Enhanced single task: apply enhancements directly to final classifier"""
+        
+        # Base prediction for compatibility matrix (if needed)
+        base_logits = None
+        if hasattr(self, 'base_classifier'):
+            base_logits = self.base_classifier(shared_features)
+        
+        # Final prediction with enhancements
+        final_logits = self.final_classifier(shared_features)
+        
+        # Apply enhancements directly to final logits
+        visual_diacritic_attention_maps = None
         
         if self.visual_diacritic_attention:
-            res = self.visual_diacritic_attention(diacritic_input_features, return_attention_weights=True)
-            vda_raw_output, visual_diacritic_attention_maps = res if isinstance(res, tuple) else (res, None)
-            current_diacritic_logits = current_diacritic_logits + vda_raw_output
-        if self.character_diacritic_compatibility:
-            # Get compatibility bias and matrix
-            compat_bias, compat_matrix = self.character_diacritic_compatibility(base_logits, diacritic_input_features)
-            current_diacritic_logits = current_diacritic_logits + compat_bias
-            compatibility_matrices.append(compat_matrix)  # Save for loss function
-
-        
-        if self.few_shot_diacritic_adapter: current_diacritic_logits = current_diacritic_logits + self.few_shot_diacritic_adapter(diacritic_input_features)
-        diacritic_logits = current_diacritic_logits
-
-        # 8. Final Classifier
-        final_logits = self.final_classifier(shared_features)
-
-        # 9. CTC Loss
-        loss = None # Will hold the final combined loss if labels are provided
-        
-        # Initialize components of the loss
-        ctc_loss_component = torch.tensor(0.0, device=pixel_values.device)
-        reg_loss_component = torch.tensor(0.0, device=pixel_values.device)
-
-        if labels is not None and label_lengths is not None:
-            # A. Calculate CTC Loss for final_logits
-            log_probs = final_logits.log_softmax(dim=2).permute(1, 0, 2) # (SeqLen, Batch, VocabSize)
-            
-            current_device = log_probs.device
-            seq_len = log_probs.size(0)
-            batch_size = log_probs.size(1)
-            
-            input_lengths = torch.full((batch_size,), seq_len, dtype=torch.long, device=current_device)
-            
-            labels_on_device = labels.to(current_device)
-            label_lengths_on_device = label_lengths.to(current_device)
-            
-            # Clamp label lengths to be at most the size of the label tensor's second dimension
-            # and also ensure they are not greater than input_lengths (seq_len)
-            clamped_label_lengths = torch.clamp(label_lengths_on_device, min=0, max=labels_on_device.size(1)) # Ensure min=0
-            clamped_label_lengths = torch.clamp(clamped_label_lengths, min=0, max=seq_len) # Ensure min=0
-
-
-            # Ensure CTCLoss requires_grad if it's zero (e.g., no valid samples)
-            # so that subsequent addition of reg_loss_component doesn't lose its grad requirement.
-            # Initialize with requires_grad=True so that if no valid samples for CTC, this tensor can still accumulate gradients from reg_loss
-            ctc_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True) 
-            
-            try:
-                ctc_loss_fn = nn.CTCLoss(blank=self.config.blank_idx, reduction='mean', zero_infinity=True)
-                
-                # Mask for valid samples (label length > 0)
-                valid_samples_mask = clamped_label_lengths > 0
-                
-                if torch.any(valid_samples_mask):
-                    # Select only valid entries for CTC loss
-                    active_log_probs = log_probs[:, valid_samples_mask, :]
-                    active_labels = labels_on_device[valid_samples_mask]
-                    # Ensure input_lengths corresponds to the selected samples for B_active
-                    active_input_lengths = input_lengths[valid_samples_mask] 
-                    active_label_lengths = clamped_label_lengths[valid_samples_mask]
-
-                    # Guard against label_length > input_length for selected active samples,
-                    # though clamping label_lengths to seq_len should largely prevent this.
-                    # This check might be redundant if clamping is perfect.
-                    mask_len_ok = active_label_lengths <= active_input_lengths
-                    if not torch.all(mask_len_ok):
-                        logger.warning(f"Found {torch.sum(~mask_len_ok)} samples where label_length > input_length after initial clamping and masking. Filtering these for CTC.")
-                        active_log_probs = active_log_probs[:, mask_len_ok, :]
-                        active_labels = active_labels[mask_len_ok]
-                        active_input_lengths = active_input_lengths[mask_len_ok]
-                        active_label_lengths = active_label_lengths[mask_len_ok]
-                    
-                    if active_labels.numel() > 0 and active_log_probs.numel() > 0 : # If any samples remain after filtering
-                        # Further check: if log_probs themselves are NaN/Inf, ctc_loss_fn will also be.
-                        if torch.isnan(active_log_probs).any() or torch.isinf(active_log_probs).any():
-                            logger.warning("Log_probs for CTC loss contained NaN or Inf. Skipping CTC calculation for this batch.")
-                            # ctc_loss_component remains 0.0 with requires_grad=True
-                        else:
-                            calculated_ctc_loss = ctc_loss_fn(
-                                active_log_probs,
-                                active_labels,
-                                active_input_lengths,
-                                active_label_lengths
-                            )
-                            if not (torch.isnan(calculated_ctc_loss) or torch.isinf(calculated_ctc_loss)):
-                                ctc_loss_component = calculated_ctc_loss
-                            else:
-                                logger.warning("CTC loss resulted in NaN or Inf. Using 0.0 for this component.")
-                                # ctc_loss_component remains 0.0 with requires_grad=True
-                # If no valid samples, ctc_loss_component remains 0.0 with requires_grad=True
-            except Exception as e:
-                logger.error(f"CTC loss calculation error: {e}", exc_info=True)
-                # ctc_loss_component remains 0.0 with requires_grad=True
-
-            # B. Calculate Compatibility Regularization Loss
-            if hasattr(self, 'character_diacritic_compatibility') and \
-               self.character_diacritic_compatibility is not None and \
-               self.config.use_character_diacritic_compatibility: 
-                
-                compat_matrix = self.character_diacritic_compatibility.compatibility_matrix
-                
-                if torch.isnan(compat_matrix).any() or torch.isinf(compat_matrix).any():
-                    logger.warning("Compatibility matrix contains NaN/Inf. Skipping regularization loss calculation.")
-                    reg_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True)
-                else:
-                    mean_val = compat_matrix.mean()
-                    target_mean = torch.tensor(-0.1, device=mean_val.device)
-                    loss_mean_reg = F.mse_loss(mean_val, target_mean)
-                    
-                    variance_val = torch.var(compat_matrix, unbiased=False) 
-                    target_variance = torch.tensor(1.0, device=variance_val.device)
-                    loss_var_reg = F.mse_loss(variance_val, target_variance)
-                    
-                    current_reg_loss = 0.001 * (loss_mean_reg + loss_var_reg)
-                    if not (torch.isnan(current_reg_loss) or torch.isinf(current_reg_loss)):
-                        reg_loss_component = current_reg_loss
-                    else:
-                        logger.warning("Regularization loss resulted in NaN or Inf. Using 0.0 for this component.")
-                        reg_loss_component = torch.tensor(0.0, device=current_device, requires_grad=True)
-            
-            # C. Combine losses
-            # Ensure loss doesn't become NaN if one component is NaN and the other is 0.0 with requires_grad=True
-            if torch.isnan(ctc_loss_component) or torch.isnan(reg_loss_component):
-                logger.error(f"NaN detected in loss components before summation! CTC: {ctc_loss_component}, Reg: {reg_loss_component}. Setting total loss to a fresh 0.0 tensor to prevent propagation.")
-                loss = torch.tensor(0.0, device=current_device, requires_grad=True) # Fallback to prevent NaN propagation
+            if return_diacritic_attention:
+                vda_output, visual_diacritic_attention_maps = self.visual_diacritic_attention(
+                    shared_features, return_attention_weights=True
+                )
             else:
-                loss = ctc_loss_component + reg_loss_component
+                vda_output = self.visual_diacritic_attention(shared_features)
+            final_logits = final_logits + vda_output
         
-        # Populate output dictionary
+        if self.character_diacritic_compatibility and base_logits is not None:
+            compat_bias, _ = self.character_diacritic_compatibility(base_logits, shared_features)
+            final_logits = final_logits + compat_bias
+        
+        if self.few_shot_diacritic_adapter:
+            fsa_output = self.few_shot_diacritic_adapter(shared_features)
+            final_logits = final_logits + fsa_output
+        
+        # Dummy diacritic logits for compatibility
+        diacritic_logits = torch.zeros(final_logits.shape[0], final_logits.shape[1], 
+                                     self.config.diacritic_vocab_size, device=final_logits.device)
+        
+        # Compute loss
+        loss = None
+        if labels is not None and label_lengths is not None:
+            loss = self._compute_loss(final_logits, base_logits, diacritic_logits,
+                                    labels, label_lengths, mode="enhanced_single")
+        
+        return self._prepare_output(final_logits, base_logits, diacritic_logits, loss,
+                                  visual_diacritic_attention_maps, return_diacritic_attention,
+                                  grad_cam_target_layer_module_name)
+
+    def _forward_parallel(self, shared_features, labels=None, label_lengths=None,
+                         return_diacritic_attention=False, grad_cam_target_layer_module_name=None):
+        """Original parallel implementation"""
+        
+        # Keep existing parallel implementation
+        base_logits = self.base_classifier(shared_features)
+        
+        # Existing diacritic processing...
+        diacritic_input_features = shared_features
+        if self.config.conditioning_method == 'concat_proj' and hasattr(self, 'diacritic_condition_proj'):
+            base_probs = F.softmax(base_logits, dim=-1)
+            diacritic_input_features = self.diacritic_condition_proj(
+                torch.cat([shared_features, base_probs], dim=-1)
+            )
+        elif self.config.conditioning_method == 'gate' and hasattr(self, 'diacritic_gate'):
+            base_probs = F.softmax(base_logits, dim=-1)
+            gate = self.diacritic_gate(torch.cat([shared_features, base_probs], dim=-1))
+            diacritic_input_features = shared_features * gate
+        
+        diacritic_logits, visual_diacritic_attention_maps = self._apply_diacritic_enhancements(
+            diacritic_input_features, base_logits, return_diacritic_attention
+        )
+        
+        final_logits = self.final_classifier(shared_features)
+        
+        loss = None
+        if labels is not None and label_lengths is not None:
+            loss = self._compute_loss(final_logits, base_logits, diacritic_logits,
+                                    labels, label_lengths, mode="parallel")
+        
+        return self._prepare_output(final_logits, base_logits, diacritic_logits, loss,
+                                  visual_diacritic_attention_maps, return_diacritic_attention,
+                                  grad_cam_target_layer_module_name)
+
+    def _apply_diacritic_enhancements(self, diacritic_features, base_logits, return_attention_weights=False):
+        """Apply diacritic enhancement modules"""
+        
+        standard_diacritic_logits = self.diacritic_classifier(diacritic_features)
+        enhanced_logits = standard_diacritic_logits
+        visual_attention_maps = None
+        
+        if self.visual_diacritic_attention:
+            if return_attention_weights:
+                vda_output, visual_attention_maps = self.visual_diacritic_attention(
+                    diacritic_features, return_attention_weights=True
+                )
+            else:
+                vda_output = self.visual_diacritic_attention(diacritic_features)
+            enhanced_logits = enhanced_logits + vda_output
+        
+        if self.character_diacritic_compatibility and base_logits is not None:
+            compat_bias, _ = self.character_diacritic_compatibility(base_logits, diacritic_features)
+            enhanced_logits = enhanced_logits + compat_bias
+        
+        if self.few_shot_diacritic_adapter:
+            fsa_output = self.few_shot_diacritic_adapter(diacritic_features)
+            enhanced_logits = enhanced_logits + fsa_output
+        
+        return enhanced_logits, visual_attention_maps
+
+    def _compute_loss(self, final_logits, base_logits, diacritic_logits, labels, label_lengths, mode):
+        """Compute loss based on hierarchical mode"""
+        
+        device = final_logits.device
+        
+        if mode == "multitask":
+            # Multi-task loss: weighted combination of all three losses
+            final_loss = self._compute_ctc_loss(final_logits, labels, label_lengths)
+            
+            # For multi-task, we need separate labels for base and diacritic
+            # For now, we'll only use final loss, but this can be extended
+            base_loss = torch.tensor(0.0, device=device, requires_grad=True)
+            diacritic_loss = torch.tensor(0.0, device=device, requires_grad=True)
+            
+            # TODO: Implement separate label generation for base and diacritic tasks
+            # This would require decomposing the combined labels
+            
+            weights = self.config.multitask_loss_weights
+            total_loss = (weights[0] * final_loss + 
+                         weights[1] * base_loss + 
+                         weights[2] * diacritic_loss)
+            
+        elif mode == "sequential":
+            # Sequential: only final loss matters (intermediate predictions are steps)
+            total_loss = self._compute_ctc_loss(final_logits, labels, label_lengths)
+            
+        else:  # parallel, enhanced_single
+            # Single task: only final loss
+            total_loss = self._compute_ctc_loss(final_logits, labels, label_lengths)
+        
+        # Add regularization losses
+        reg_loss = self._compute_regularization_loss(device)
+        total_loss = total_loss + reg_loss
+        
+        return total_loss
+
+    def _compute_ctc_loss(self, logits, labels, label_lengths):
+        """Helper method to compute CTC loss (existing implementation)"""
+        # ... existing CTC loss computation code ...
+        log_probs = logits.log_softmax(dim=2).permute(1, 0, 2)
+        device = log_probs.device
+        seq_len = log_probs.size(0)
+        batch_size = log_probs.size(1)
+        
+        input_lengths = torch.full((batch_size,), seq_len, dtype=torch.long, device=device)
+        labels_on_device = labels.to(device)
+        label_lengths_on_device = label_lengths.to(device)
+        
+        clamped_label_lengths = torch.clamp(label_lengths_on_device, min=0, max=labels_on_device.size(1))
+        clamped_label_lengths = torch.clamp(clamped_label_lengths, min=0, max=seq_len)
+        
+        ctc_loss_component = torch.tensor(0.0, device=device, requires_grad=True)
+        
+        try:
+            ctc_loss_fn = nn.CTCLoss(blank=self.config.blank_idx, reduction='mean', zero_infinity=True)
+            valid_samples_mask = clamped_label_lengths > 0
+            
+            if torch.any(valid_samples_mask):
+                active_log_probs = log_probs[:, valid_samples_mask, :]
+                active_labels = labels_on_device[valid_samples_mask]
+                active_input_lengths = input_lengths[valid_samples_mask]
+                active_label_lengths = clamped_label_lengths[valid_samples_mask]
+                
+                mask_len_ok = active_label_lengths <= active_input_lengths
+                if not torch.all(mask_len_ok):
+                    logger.warning(f"Filtering {torch.sum(~mask_len_ok)} samples where label_length > input_length")
+                    active_log_probs = active_log_probs[:, mask_len_ok, :]
+                    active_labels = active_labels[mask_len_ok]
+                    active_input_lengths = active_input_lengths[mask_len_ok]
+                    active_label_lengths = active_label_lengths[mask_len_ok]
+                
+                if active_labels.numel() > 0 and active_log_probs.numel() > 0:
+                    if not (torch.isnan(active_log_probs).any() or torch.isinf(active_log_probs).any()):
+                        calculated_ctc_loss = ctc_loss_fn(
+                            active_log_probs, active_labels, active_input_lengths, active_label_lengths
+                        )
+                        if not (torch.isnan(calculated_ctc_loss) or torch.isinf(calculated_ctc_loss)):
+                            ctc_loss_component = calculated_ctc_loss
+                        else:
+                            logger.warning("CTC loss resulted in NaN or Inf")
+                    else:
+                        logger.warning("Log_probs contained NaN or Inf")
+        except Exception as e:
+            logger.error(f"CTC loss calculation error: {e}")
+        
+        return ctc_loss_component
+
+    def _compute_regularization_loss(self, device):
+        """Compute regularization losses including linguistic constraints"""
+        reg_loss = torch.tensor(0.0, device=device, requires_grad=True)
+        
+        # Existing compatibility matrix regularization (keep this)
+        if (hasattr(self, 'character_diacritic_compatibility') and 
+            self.character_diacritic_compatibility is not None and
+            self.config.use_character_diacritic_compatibility):
+            
+            compat_matrix = self.character_diacritic_compatibility.compatibility_matrix
+            if not (torch.isnan(compat_matrix).any() or torch.isinf(compat_matrix).any()):
+                # Original regularization (for variance and mean)
+                mean_val = compat_matrix.mean()
+                target_mean = torch.tensor(-0.1, device=mean_val.device)
+                loss_mean_reg = F.mse_loss(mean_val, target_mean)
+                
+                variance_val = torch.var(compat_matrix, unbiased=False)
+                target_variance = torch.tensor(1.0, device=variance_val.device)
+                loss_var_reg = F.mse_loss(variance_val, target_variance)
+                
+                # 🔥 NEW: Linguistic regularization (stronger weight)
+                linguistic_loss = self.character_diacritic_compatibility.get_linguistic_regularization_loss(
+                    strength=0.1  # Adjust this weight - higher = stronger linguistic enforcement
+                )
+                
+                # Combine all compatibility losses
+                current_reg_loss = 0.001 * (loss_mean_reg + loss_var_reg) + linguistic_loss
+                
+                if not (torch.isnan(current_reg_loss) or torch.isinf(current_reg_loss)):
+                    reg_loss = current_reg_loss
+                else:
+                    logger.warning("Regularization loss resulted in NaN or Inf")
+        
+        return reg_loss
+
+    def _prepare_output(self, final_logits, base_logits, diacritic_logits, loss,
+                       visual_attention_maps, return_diacritic_attention, grad_cam_target):
+        """Prepare model output dictionary"""
+        
         output_dict = {
-            'loss': loss, 
-            'logits': final_logits, 
-            'base_logits': base_logits, 
+            'loss': loss,
+            'logits': final_logits,
+            'base_logits': base_logits if base_logits is not None else torch.empty(0),
             'diacritic_logits': diacritic_logits
         }
-        if return_diacritic_attention and visual_diacritic_attention_maps is not None:
-            output_dict['visual_diacritic_attention_maps'] = visual_diacritic_attention_maps
         
-        if grad_cam_target_layer_module_name:
-            grad_cam_target_logits = diacritic_logits # Default target for CAM on diacritics
-            if self.visual_diacritic_attention and vda_raw_output is not None:
-                 # If VDA is active and produced output, it's a more specific target
-                grad_cam_target_logits = vda_raw_output
-            output_dict['grad_cam_target_logits'] = grad_cam_target_logits
-            
+        if return_diacritic_attention and visual_attention_maps is not None:
+            output_dict['visual_diacritic_attention_maps'] = visual_attention_maps
+        
+        if grad_cam_target:
+            # Choose appropriate target based on mode and available outputs
+            if self.visual_diacritic_attention and diacritic_logits.numel() > 0:
+                output_dict['grad_cam_target_logits'] = diacritic_logits
+            elif final_logits.numel() > 0:
+                output_dict['grad_cam_target_logits'] = final_logits
+            else:
+                output_dict['grad_cam_target_logits'] = None
+        
         return output_dict
 
+    def _compute_multitask_loss_with_decomposition(self, final_logits, base_logits, diacritic_logits, 
+                                                labels, label_lengths):
+        """Compute true multi-task loss with label decomposition"""
+        
+        device = final_logits.device
+        
+        # Decompose labels for multi-task learning
+        try:
+            from utils.label_decomposition import decompose_labels_for_multitask
+            base_labels, diacritic_labels = decompose_labels_for_multitask(
+                labels, self.combined_char_vocab, self.base_char_vocab, self.diacritic_vocab
+            )
+        except ImportError:
+            logger.warning("Label decomposition not available, using single-task loss")
+            return self._compute_ctc_loss(final_logits, labels, label_lengths)
+        
+        # Compute individual losses
+        final_loss = self._compute_ctc_loss(final_logits, labels, label_lengths)
+        base_loss = self._compute_ctc_loss(base_logits, base_labels, label_lengths)
+        diacritic_loss = self._compute_ctc_loss(diacritic_logits, diacritic_labels, label_lengths)
+        
+        # Weighted combination
+        weights = self.config.multitask_loss_weights
+        total_loss = (weights[0] * final_loss + 
+                    weights[1] * base_loss + 
+                    weights[2] * diacritic_loss)
+        
+        # Log individual losses for monitoring
+        if hasattr(self, '_log_individual_losses'):
+            self._log_individual_losses(final_loss, base_loss, diacritic_loss, total_loss)
+        
+        return total_loss
+
+    def _log_individual_losses(self, final_loss, base_loss, diacritic_loss, total_loss):
+        """Log individual loss components (for debugging)"""
+        if torch.distributed.is_initialized() and torch.distributed.get_rank() == 0:
+            logger.debug(f"Loss breakdown - Final: {final_loss:.4f}, Base: {base_loss:.4f}, "
+                        f"Diacritic: {diacritic_loss:.4f}, Total: {total_loss:.4f}")
+
+
     def save_pretrained(self, save_directory, **kwargs):
+        """Enhanced save method that handles all hierarchical modes"""
         logger.info(f"Saving {self.__class__.__name__} model to: {save_directory}")
         os.makedirs(save_directory, exist_ok=True)
-        # Ensure vocabs are in config
+        
+        # Update config with current model state
         self.config.base_char_vocab = self.base_char_vocab
         self.config.diacritic_vocab = self.diacritic_vocab
         self.config.combined_char_vocab = self.combined_char_vocab
         self.config.base_char_vocab_size = len(self.base_char_vocab)
         self.config.diacritic_vocab_size = len(self.diacritic_vocab)
         self.config.combined_char_vocab_size = len(self.combined_char_vocab)
+        
         # Save vision_encoder_config as dict for better compatibility
         if hasattr(self.vision_encoder, 'config') and self.vision_encoder.config is not None:
             self.config.vision_encoder_config = self.vision_encoder.config.to_dict()
         else:
-            logger.warning("Vision encoder config not found or is None, cannot save to dict.")
-            self.config.vision_encoder_config = {} # Save empty dict
-
+            logger.warning("Vision encoder config not found, saving empty dict")
+            self.config.vision_encoder_config = {}
+        
+        # Save model architecture info
+        self.config.model_description = self.get_model_description()
+        
+        # Save the configuration
         self.config.save_pretrained(save_directory)
-        torch.save(self.state_dict(), os.path.join(save_directory, "pytorch_model.bin"))
+        
+        # Create comprehensive state dict
+        state_dict = self.state_dict()
+        
+        # Add metadata about which components are present
+        metadata = {
+            'hierarchical_mode': self.config.hierarchical_mode,
+            'components_present': self._get_component_inventory(),
+            'model_description': self.get_model_description(),
+            'training_completed': True,
+            'pytorch_version': torch.__version__,
+            'save_timestamp': datetime.now().isoformat()
+        }
+        
+        # Save state dict with metadata
+        full_checkpoint = {
+            'model_state_dict': state_dict,
+            'metadata': metadata,
+            'config_dict': self.config.to_dict()
+        }
+        
+        torch.save(full_checkpoint, os.path.join(save_directory, "pytorch_model.bin"))
+        
+        # Save processor if available
         if hasattr(self, 'processor') and self.processor:
-            try: self.processor.save_pretrained(save_directory)
-            except Exception as e: logger.warning(f"Could not save processor: {e}")
-        logger.info("Model components saved.")
+            try:
+                self.processor.save_pretrained(save_directory)
+                logger.info("Processor saved successfully")
+            except Exception as e:
+                logger.warning(f"Could not save processor: {e}")
+        
+        # Save vocabularies as separate files for easy access
+        self._save_vocabularies(save_directory)
+        
+        # Save component-specific information
+        self._save_component_info(save_directory)
+        
+        logger.info(f"Model saved successfully: {self.get_model_description()}")
 
+    def _get_component_inventory(self):
+        """Get inventory of which components are present in the model"""
+        components = {
+            'base_classifier': hasattr(self, 'base_classifier') and self.base_classifier is not None,
+            'diacritic_classifier': hasattr(self, 'diacritic_classifier') and self.diacritic_classifier is not None,
+            'final_classifier': hasattr(self, 'final_classifier') and self.final_classifier is not None,
+            'dynamic_fusion': hasattr(self, 'dynamic_fusion') and self.dynamic_fusion is not None,
+            'feature_enhancer': hasattr(self, 'feature_enhancer') and self.feature_enhancer is not None,
+            'visual_diacritic_attention': hasattr(self, 'visual_diacritic_attention') and self.visual_diacritic_attention is not None,
+            'character_diacritic_compatibility': hasattr(self, 'character_diacritic_compatibility') and self.character_diacritic_compatibility is not None,
+            'few_shot_diacritic_adapter': hasattr(self, 'few_shot_diacritic_adapter') and self.few_shot_diacritic_adapter is not None,
+            'diacritic_fusion': hasattr(self, 'diacritic_fusion') and self.diacritic_fusion is not None,
+            'final_fusion': hasattr(self, 'final_fusion') and self.final_fusion is not None,
+            'diacritic_condition_proj': hasattr(self, 'diacritic_condition_proj') and self.diacritic_condition_proj is not None,
+            'diacritic_gate': hasattr(self, 'diacritic_gate') and self.diacritic_gate is not None,
+        }
+        return components
+
+    def _save_vocabularies(self, save_directory):
+        """Save vocabularies as separate JSON files"""
+        vocabs_dir = os.path.join(save_directory, "vocabularies")
+        os.makedirs(vocabs_dir, exist_ok=True)
+        
+        vocab_files = {
+            'base_char_vocab.json': self.base_char_vocab,
+            'diacritic_vocab.json': self.diacritic_vocab,
+            'combined_char_vocab.json': self.combined_char_vocab
+        }
+        
+        for filename, vocab in vocab_files.items():
+            vocab_path = os.path.join(vocabs_dir, filename)
+            try:
+                with open(vocab_path, 'w', encoding='utf-8') as f:
+                    json.dump(vocab, f, ensure_ascii=False, indent=2)
+                logger.debug(f"Saved {filename}")
+            except Exception as e:
+                logger.warning(f"Could not save {filename}: {e}")
+
+    def _save_component_info(self, save_directory):
+        """Save detailed component information"""
+        info_path = os.path.join(save_directory, "model_info.json")
+        
+        component_info = {
+            'hierarchical_mode': self.config.hierarchical_mode,
+            'model_description': self.get_model_description(),
+            'components_present': self._get_component_inventory(),
+            'architecture_details': {
+                'vision_encoder_layers': getattr(self.config, 'vision_encoder_layer_indices', []),
+                'fusion_method': getattr(self.config, 'feature_fusion_method', 'unknown'),
+                'transformer_layers': getattr(self.config, 'num_transformer_encoder_layers', 0),
+                'conditioning_method': getattr(self.config, 'conditioning_method', 'none'),
+            },
+            'enhancement_modules': {
+                'visual_diacritic_attention': self.config.use_visual_diacritic_attention,
+                'character_diacritic_compatibility': self.config.use_character_diacritic_compatibility,
+                'few_shot_diacritic_adapter': self.config.use_few_shot_diacritic_adapter,
+                'dynamic_fusion': self.config.use_dynamic_fusion,
+                'feature_enhancer': self.config.use_feature_enhancer,
+            },
+            'vocabulary_sizes': {
+                'base_chars': len(self.base_char_vocab),
+                'diacritics': len(self.diacritic_vocab), 
+                'combined': len(self.combined_char_vocab)
+            }
+        }
+        
+        try:
+            with open(info_path, 'w', encoding='utf-8') as f:
+                json.dump(component_info, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved model info to {info_path}")
+        except Exception as e:
+            logger.warning(f"Could not save model info: {e}")
+            
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, config=None, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, config=None, strict_loading=True, **kwargs):
+        """Enhanced loading method that handles all hierarchical modes"""
         logger.info(f"Loading {cls.__name__} from: {pretrained_model_name_or_path}")
-        config_path = os.path.join(pretrained_model_name_or_path, "config.json")
-        loaded_config_dict = {} # For kwargs passed to config init
-
+        
+        # Determine if this is a local directory or HuggingFace model
+        is_local_dir = os.path.isdir(pretrained_model_name_or_path)
+        
+        if is_local_dir:
+            # Local directory - direct file paths
+            config_path = os.path.join(pretrained_model_name_or_path, "config.json")
+            checkpoint_path = os.path.join(pretrained_model_name_or_path, "pytorch_model.bin")
+            model_info_path = os.path.join(pretrained_model_name_or_path, "model_info.json")
+            
+            # Check if this is our custom model or a base model
+            is_our_custom_model = os.path.exists(model_info_path)
+            
+        else:
+            # HuggingFace Hub model - need to download files
+            try:
+                from huggingface_hub import hf_hub_download
+                
+                # Always try to download config.json and pytorch_model.bin
+                config_path = hf_hub_download(repo_id=pretrained_model_name_or_path, filename="config.json")
+                
+                # For pytorch_model.bin, it might be named differently
+                try:
+                    checkpoint_path = hf_hub_download(repo_id=pretrained_model_name_or_path, filename="pytorch_model.bin")
+                except:
+                    # Try alternative names
+                    try:
+                        checkpoint_path = hf_hub_download(repo_id=pretrained_model_name_or_path, filename="model.safetensors")
+                    except:
+                        checkpoint_path = None
+                        logger.warning("No model weights found - will use random initialization")
+                
+                # Try to download model_info.json but don't fail if it doesn't exist
+                model_info_path = None
+                try:
+                    model_info_path = hf_hub_download(
+                        repo_id=pretrained_model_name_or_path, 
+                        filename="model_info.json",
+                        local_files_only=False  # Allow download
+                    )
+                except:
+                    # model_info.json doesn't exist - this is likely a base model
+                    logger.info("No model_info.json found - treating as base model")
+                    model_info_path = None
+                
+                is_our_custom_model = model_info_path is not None
+                
+            except Exception as e:
+                logger.error(f"Error downloading from HuggingFace Hub: {e}")
+                raise ValueError(f"Could not load model from {pretrained_model_name_or_path}: {e}")
+        
+        # Load model info if available
+        model_info = {}
+        if model_info_path and os.path.exists(model_info_path):
+            try:
+                with open(model_info_path, 'r', encoding='utf-8') as f:
+                    model_info = json.load(f)
+                logger.info(f"Loaded model info: {model_info.get('model_description', 'Unknown')}")
+            except Exception as e:
+                logger.warning(f"Could not load model info: {e}")
+        
+        # Load or create configuration
         if config is not None and isinstance(config, cls.config_class):
             loaded_config = config
-            logger.info("Using provided config object.")
+            logger.info("Using provided config object")
             # Update with kwargs
             for key, value in kwargs.items():
-                if hasattr(loaded_config, key): setattr(loaded_config, key, value)
-                else: loaded_config_dict[key] = value # Store for later if it's a new config arg
-        elif os.path.exists(config_path):
-            # from_pretrained on config class will handle kwargs override
-            loaded_config = cls.config_class.from_pretrained(pretrained_model_name_or_path, **kwargs)
-            logger.info(f"Loaded config from file, applied/overrode with kwargs: {kwargs}")
-        else: # No config file, attempt to init from kwargs or defaults
-            logger.warning(f"Config file not found at {config_path}. Initializing new config.")
-            # Pass all kwargs to config constructor
-            loaded_config_dict.update(kwargs)
-            # Ensure essential vocabs are present if not in defaults
-            if 'combined_char_vocab' not in loaded_config_dict:
-                raise ValueError("combined_char_vocab is required if config.json is not present.")
-            loaded_config = cls.config_class(**loaded_config_dict)
-
-        # Ensure vision_encoder_config is an object
-        if hasattr(loaded_config, 'vision_encoder_config') and isinstance(loaded_config.vision_encoder_config, dict):
-            vision_config_data = loaded_config.vision_encoder_config
-            try: # Try to get specific config class
-                from transformers import AutoConfig
-                # Use vision_encoder_name from the config to get a hint for AutoConfig
-                # Default to vision_encoder_name itself if model_type isn't in vision_config_data
-                vision_model_identifier = vision_config_data.get("model_type", loaded_config.vision_encoder_name)
-
-                if "trocr" in loaded_config.vision_encoder_name.lower() and "vit" not in vision_model_identifier.lower() : # TrOCR special case
-                    from transformers import ViTConfig
-                    vision_config_obj = ViTConfig(**vision_config_data)
-                    logger.info("Using ViTConfig for TrOCR-like model based on vision_encoder_name.")
-                else:
-                    # Attempt to get the specific config class using AutoConfig
-                    # This relies on 'model_type' in vision_config_data or vision_encoder_name being informative
-                    specific_vision_config = AutoConfig.from_pretrained(vision_model_identifier, trust_remote_code=True)
-                    vision_config_obj = specific_vision_config.__class__(**vision_config_data)
-
-                loaded_config.vision_encoder_config = vision_config_obj
-                logger.info(f"Converted vision_encoder_config dict to {vision_config_obj.__class__.__name__} object.")
-            except Exception as e_conf:
-                logger.warning(f"Could not auto-detect specific vision config type for '{vision_model_identifier}': {e_conf}. Using PretrainedConfig as base.")
-                base_vision_conf = PretrainedConfig() # Fallback
-                for k_vc, v_vc in vision_config_data.items(): setattr(base_vision_conf, k_vc, v_vc)
-                loaded_config.vision_encoder_config = base_vision_conf
+                if hasattr(loaded_config, key):
+                    setattr(loaded_config, key, value)
+        elif config_path and os.path.exists(config_path):
+            if is_our_custom_model:
+                # This is our custom model - load our config
+                try:
+                    loaded_config = cls.config_class.from_pretrained(
+                        os.path.dirname(config_path) if os.path.isfile(config_path) else config_path,
+                        **kwargs
+                    )
+                    logger.info(f"Loaded custom config from: {config_path}")
+                except Exception as e:
+                    logger.warning(f"Could not load as custom config: {e}. Creating new config.")
+                    loaded_config = cls._create_config_from_base_model(pretrained_model_name_or_path, **kwargs)
+            else:
+                # This is a base model (like TrOCR) - create our config
+                logger.info("Base model detected - creating custom config")
+                loaded_config = cls._create_config_from_base_model(pretrained_model_name_or_path, **kwargs)
+        else:
+            logger.warning(f"Config file not found. Creating new config.")
+            # Ensure essential parameters are provided
+            if 'combined_char_vocab' not in kwargs:
+                raise ValueError("combined_char_vocab is required when config.json is not available")
+            loaded_config = cls.config_class(**kwargs)
         
-        # Update vocab lists and sizes from kwargs if they were explicitly passed
+        # Handle vision_encoder_config conversion
+        loaded_config = cls._process_vision_encoder_config(loaded_config)
+        
+        # Update vocab lists from kwargs if provided
         for vocab_name in ['base_char_vocab', 'diacritic_vocab', 'combined_char_vocab']:
             if vocab_name in kwargs and kwargs[vocab_name]:
                 setattr(loaded_config, vocab_name, kwargs[vocab_name])
                 setattr(loaded_config, f"{vocab_name}_size", len(kwargs[vocab_name]))
-
-        model = cls(loaded_config) # Instantiate model with the finalized config
-
-        state_dict_path = os.path.join(pretrained_model_name_or_path, "pytorch_model.bin")
-        if os.path.exists(state_dict_path) and os.path.exists(config_path): # Only load if it's a full checkpoint
-            logger.info(f"Loading state dict from: {state_dict_path}")
-            try:
-                state_dict = torch.load(state_dict_path, map_location="cpu")
-                load_result = model.load_state_dict(state_dict, strict=False)
-                logger.info(f"Loaded state. Missing: {load_result.missing_keys}, Unexpected: {load_result.unexpected_keys}")
-            except Exception as e: logger.error(f"Error loading state dict: {e}", exc_info=True)
+        
+        # Load vocabularies from separate files if main config doesn't have them
+        if not loaded_config.combined_char_vocab and is_local_dir:
+            loaded_config = cls._load_vocabularies_from_files(loaded_config, pretrained_model_name_or_path)
+        
+        # Validate configuration compatibility
+        if model_info:
+            cls._validate_config_compatibility(loaded_config, model_info)
+        
+        # Instantiate model
+        logger.info(f"Instantiating model with mode: {loaded_config.hierarchical_mode}")
+        model = cls(loaded_config)
+        
+        # Load state dict if available
+        if checkpoint_path and os.path.exists(checkpoint_path):
+            model = cls._load_model_weights(model, checkpoint_path, strict_loading, model_info, is_our_custom_model)
+            
         else:
-            logger.info(f"Not loading full model state_dict (either config.json or pytorch_model.bin missing at {pretrained_model_name_or_path}). Using base vision weights and/or random init for custom parts.")
-
+            logger.warning(f"No checkpoint found. Using base model initialization.")
+        
+        # Set vocabulary attributes
         model.base_char_vocab = loaded_config.base_char_vocab
         model.diacritic_vocab = loaded_config.diacritic_vocab
         model.combined_char_vocab = loaded_config.combined_char_vocab
+        
+        # Validate loaded model
+        if model_info:
+            cls._validate_loaded_model(model, model_info)
+        
+        logger.info(f"Successfully loaded model: {model.get_model_description()}")
         return model
+
+
+    @classmethod
+    def _process_vision_encoder_config(cls, config):
+        """Process vision encoder config to ensure it's an object"""
+        if hasattr(config, 'vision_encoder_config') and isinstance(config.vision_encoder_config, dict):
+            vision_config_data = config.vision_encoder_config
+            try:
+                from transformers import AutoConfig
+                
+                # Special handling for TrOCR models
+                if "trocr" in config.vision_encoder_name.lower():
+                    from transformers import ViTConfig
+                    config.vision_encoder_config = ViTConfig(**{k: v for k, v in vision_config_data.items() if k != "model_type"})
+                    logger.info("Using ViTConfig for TrOCR-based model")
+                else:
+                    # Try to auto-detect config type
+                    vision_model_type = vision_config_data.get("model_type", config.vision_encoder_name)
+                    specific_config = AutoConfig.for_model(vision_model_type)
+                    config.vision_encoder_config = specific_config(**vision_config_data)
+                    logger.info(f"Using {specific_config.__class__.__name__} for vision encoder")
+                    
+            except Exception as e:
+                logger.warning(f"Could not create specific vision config: {e}. Using generic config.")
+                from transformers import PretrainedConfig
+                base_config = PretrainedConfig()
+                for k, v in vision_config_data.items():
+                    setattr(base_config, k, v)
+                config.vision_encoder_config = base_config
+        
+        return config
+
+    @classmethod  
+    def _load_vocabularies_from_files(cls, config, model_path):
+        """Load vocabularies from separate JSON files"""
+        vocabs_dir = os.path.join(model_path, "vocabularies") if os.path.isdir(model_path) else None
+        
+        if vocabs_dir and os.path.exists(vocabs_dir):
+            vocab_files = {
+                'base_char_vocab': 'base_char_vocab.json',
+                'diacritic_vocab': 'diacritic_vocab.json', 
+                'combined_char_vocab': 'combined_char_vocab.json'
+            }
+            
+            for attr_name, filename in vocab_files.items():
+                file_path = os.path.join(vocabs_dir, filename)
+                if os.path.exists(file_path):
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            vocab = json.load(f)
+                        setattr(config, attr_name, vocab)
+                        setattr(config, f"{attr_name}_size", len(vocab))
+                        logger.info(f"Loaded {attr_name} from {filename} ({len(vocab)} items)")
+                    except Exception as e:
+                        logger.warning(f"Could not load {filename}: {e}")
+        
+        return config
+
+    @classmethod
+    def _validate_config_compatibility(cls, config, model_info):
+        """Validate that config is compatible with saved model"""
+        if not model_info:
+            return
+        
+        saved_mode = model_info.get('hierarchical_mode')
+        if saved_mode and saved_mode != config.hierarchical_mode:
+            logger.warning(f"Config hierarchical_mode ({config.hierarchical_mode}) differs from saved model ({saved_mode})")
+        
+        saved_components = model_info.get('components_present', {})
+        current_enhancements = {
+            'visual_diacritic_attention': config.use_visual_diacritic_attention,
+            'character_diacritic_compatibility': config.use_character_diacritic_compatibility,
+            'few_shot_diacritic_adapter': config.use_few_shot_diacritic_adapter,
+            'dynamic_fusion': config.use_dynamic_fusion,
+            'feature_enhancer': config.use_feature_enhancer,
+        }
+        
+        for component, expected in saved_components.items():
+            if component in current_enhancements:
+                current = current_enhancements[component]
+                if current != expected:
+                    logger.warning(f"Component {component}: config={current}, saved={expected}")
+
+    @classmethod
+    def _load_model_weights(cls, model, checkpoint_path, strict_loading, model_info, is_our_custom_model=None):
+        """Load model weights with handling for both custom and base models"""
+        logger.info(f"Loading model weights from: {checkpoint_path}")
+        
+        # Auto-detect if this is our custom model if not specified
+        if is_our_custom_model is None:
+            is_our_custom_model = model_info is not None and 'hierarchical_mode' in model_info
+        
+        try:
+            # Handle different file formats
+            if checkpoint_path.endswith('.safetensors'):
+                try:
+                    from safetensors.torch import load_file
+                    state_dict = load_file(checkpoint_path)
+                    metadata = {}
+                    logger.info("Loaded safetensors format")
+                except ImportError:
+                    logger.error("safetensors not available but .safetensors file provided")
+                    raise
+            else:
+                # checkpoint = torch.load(checkpoint_path, map_location="cpu")
+                try:
+                    # Try with weights_only=True first (secure)
+                    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+                except Exception as e:
+                    logger.warning(f"Failed to load with weights_only=True: {e}")
+                    logger.info("Falling back to weights_only=False (less secure but compatible)")
+                    # Fall back to weights_only=False for compatibility
+                    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+
+                # Handle different checkpoint formats
+                if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                    # Our custom format
+                    state_dict = checkpoint['model_state_dict']
+                    metadata = checkpoint.get('metadata', {})
+                    logger.info(f"Loaded custom checkpoint with metadata: {metadata.get('model_description', 'Unknown')}")
+                else:
+                    # Standard format (like TrOCR)
+                    state_dict = checkpoint
+                    metadata = {}
+                    logger.info("Loaded standard checkpoint format")
+            
+            if is_our_custom_model:
+                # Loading our custom model - expect exact match
+                missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=strict_loading)
+            else:
+                # Loading from base model - only load vision encoder weights
+                vision_encoder_state = {}
+                for key, value in state_dict.items():
+                    if key.startswith('encoder.') or key.startswith('vision_model.'):
+                        # Map base model keys to our vision_encoder
+                        new_key = key.replace('encoder.', 'vision_encoder.').replace('vision_model.', 'vision_encoder.')
+                        vision_encoder_state[new_key] = value
+                    elif key.startswith('vision_encoder.'):
+                        vision_encoder_state[key] = value
+                
+                if vision_encoder_state:
+                    missing_keys, unexpected_keys = model.load_state_dict(vision_encoder_state, strict=False)
+                    logger.info(f"Loaded {len(vision_encoder_state)} vision encoder weights from base model")
+                else:
+                    logger.warning("No compatible vision encoder weights found in base model")
+                    missing_keys, unexpected_keys = [], []
+            
+            # Report loading results
+            if missing_keys:
+                if is_our_custom_model:
+                    logger.warning(f"Missing keys in checkpoint: {len(missing_keys)} keys")
+                    logger.debug(f"Missing keys: {missing_keys[:10]}...")
+                else:
+                    logger.info(f"Missing keys (expected for base model): {len(missing_keys)} keys")
+            if unexpected_keys:
+                logger.warning(f"Unexpected keys: {len(unexpected_keys)} keys")
+                logger.debug(f"Unexpected keys: {unexpected_keys[:10]}...")
+            
+            if is_our_custom_model and not missing_keys and not unexpected_keys:
+                logger.info("All model weights loaded successfully")
+            elif not is_our_custom_model:
+                logger.info("Vision encoder weights loaded from base model, other components randomly initialized")
+            elif not strict_loading:
+                logger.info("Model weights loaded with warnings (strict=False)")
+            else:
+                logger.error("Model weight loading failed with strict=True")
+                
+        except Exception as e:
+            logger.error(f"Error loading model weights: {e}")
+            if strict_loading:
+                raise
+            logger.warning("Continuing with random initialization due to loading error")
+        
+        return model
+
+    @classmethod
+    def _validate_loaded_model(cls, model, model_info):
+        """Validate that the loaded model is working correctly"""
+        try:
+            # Basic validation: check that model can do a forward pass
+            dummy_input = torch.randn(1, 3, 384, 384)
+            
+            with torch.no_grad():
+                outputs = model(dummy_input)
+            
+            # Check output structure
+            required_keys = ['logits', 'base_logits', 'diacritic_logits']
+            for key in required_keys:
+                if key not in outputs:
+                    logger.warning(f"Missing output key: {key}")
+            
+            logger.info("Model validation passed")
+            
+        except Exception as e:
+            logger.error(f"Model validation failed: {e}")
+            logger.warning("Model may not function correctly")
+
+    def get_model_description(self):
+        """Get a descriptive name based on current configuration"""
+        mode = self.config.hierarchical_mode
+        enhancements = []
+        
+        if getattr(self.config, 'use_dynamic_fusion', False):
+            enhancements.append("DynFusion")
+        if getattr(self.config, 'use_feature_enhancer', False):
+            enhancements.append("FeatEnh")
+        if getattr(self.config, 'use_visual_diacritic_attention', False):
+            enhancements.append("VDA")
+        if getattr(self.config, 'use_character_diacritic_compatibility', False):
+            enhancements.append("CDC")
+        if getattr(self.config, 'use_few_shot_diacritic_adapter', False):
+            enhancements.append("FSA")
+        
+        enhancement_str = "+".join(enhancements) if enhancements else "Base"
+        
+        mode_names = {
+            "enhanced_single": "Enhanced-CTC",
+            "parallel": "Parallel-CTC",
+            "sequential": "Sequential-HCTC", 
+            "multitask": "MultiTask-CTC"
+        }
+        
+        base_name = mode_names.get(mode, f"{mode}-CTC")
+        return f"{base_name}-{enhancement_str}"
+
+    @classmethod
+    def _create_config_from_base_model(cls, base_model_name, **kwargs):
+        """Create our config when loading from a base model like TrOCR"""
+        
+        # Set defaults for base model loading
+        config_kwargs = {
+            'vision_encoder_name': base_model_name,
+            'hierarchical_mode': kwargs.get('hierarchical_mode', 'enhanced_single'),
+            'use_dynamic_fusion': kwargs.get('use_dynamic_fusion', False),
+            'use_feature_enhancer': kwargs.get('use_feature_enhancer', False),
+            'use_visual_diacritic_attention': kwargs.get('use_visual_diacritic_attention', False),
+            'use_character_diacritic_compatibility': kwargs.get('use_character_diacritic_compatibility', False),
+            'use_few_shot_diacritic_adapter': kwargs.get('use_few_shot_diacritic_adapter', False),
+            # Add other required parameters
+            **kwargs
+        }
+        
+        # Ensure required vocabularies are present
+        if 'combined_char_vocab' not in config_kwargs:
+            raise ValueError("combined_char_vocab must be provided when loading from base model")
+        
+        logger.info(f"Creating config for base model: {base_model_name}")
+        return cls.config_class(**config_kwargs)
 
 # --- Combined Multi-Scale Model Class ---
 class HierarchicalCtcMultiScaleOcrModel(HierarchicalCtcTransformerOcrModel):

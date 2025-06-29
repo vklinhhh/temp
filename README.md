@@ -82,6 +82,11 @@ python scripts/train_hierarchical_ctc.py \
     --wandb_project vietnam-ocr
 ```
 
+```
+python -m scripts.train_hierarchical_ctc   --dataset_name vklinhhh/vnhwt_opt_3    --output_dir outputs/opt_3_sequential_ablation    --use_dynamic_fusion --use_feature_enhancer   --transformer_d_model 768   --transformer_nhead 12   --num_transformer_layers 6   --shared_hidden_size 768   --batch_size 16   --learning_rate 5e-5   --discriminative_lr   --encoder_lr_factor 0.1   --warmup_ratio 0.05   --weight_decay 0.02   --epochs 50   --use_character_diacritic_compatibility   --use_amp   --fusion_method concat_proj --log_compatibility_interval 15000 --wandb_proj opt_3_sequential --early_stopping_patience 7 --hierarchical_mode sequential  --no_middle_diacritic_conditioning
+```
+
+
 ### Evaluation
 
 ```python

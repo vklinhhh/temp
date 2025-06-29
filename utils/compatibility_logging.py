@@ -201,3 +201,59 @@ def track_compatibility_matrix_gradients(model, epoch, step, output_dir, log_int
     # Save raw gradient data (optional, can be large)
     # np.save(os.path.join(grad_dir, f"compat_matrix_grad_e{epoch}_s{step}.npy"), 
     #         compat_matrix.grad.detach().cpu().numpy())
+
+
+def log_compatibility_effects_during_training(model, base_logits, raw_diacritic_logits, 
+                                            enhanced_diacritic_logits, epoch, step, 
+                                            output_dir, log_interval=1000):
+    """Log the actual effects of compatibility matrix during training"""
+    if step % log_interval != 0:
+        return
+    
+    if not hasattr(model, 'character_diacritic_compatibility') or model.character_diacritic_compatibility is None:
+        return
+    
+    # Calculate compatibility bias
+    compatibility_bias = enhanced_diacritic_logits - raw_diacritic_logits
+    
+    # Get base character predictions
+    base_preds = torch.argmax(base_logits, dim=-1)
+    
+    # Analyze bias effects for specific characters
+    effects_log = []
+    
+    for sample_idx in range(min(2, base_logits.shape[0])):
+        for time_idx in range(min(5, base_logits.shape[1])):
+            base_char_idx = base_preds[sample_idx, time_idx].item()
+            base_char = model.base_char_vocab[base_char_idx]
+            
+            bias_vector = compatibility_bias[sample_idx, time_idx]
+            
+            # Find most boosted and suppressed diacritics
+            top_k = 3
+            boosted_indices = torch.topk(bias_vector, k=top_k).indices
+            suppressed_indices = torch.topk(bias_vector, k=top_k, largest=False).indices
+            
+            boosted_diacritics = [(model.diacritic_vocab[idx.item()], bias_vector[idx].item()) 
+                                for idx in boosted_indices]
+            suppressed_diacritics = [(model.diacritic_vocab[idx.item()], bias_vector[idx].item()) 
+                                   for idx in suppressed_indices]
+            
+            effects_log.append({
+                'base_char': base_char,
+                'boosted': boosted_diacritics,
+                'suppressed': suppressed_diacritics
+            })
+    
+    # Save to file
+    effects_file = os.path.join(output_dir, "compatibility_effects", f"effects_e{epoch}_s{step}.json")
+    os.makedirs(os.path.dirname(effects_file), exist_ok=True)
+    
+    with open(effects_file, 'w', encoding='utf-8') as f:
+        json.dump(effects_log, f, ensure_ascii=False, indent=2)
+    
+    # Log summary to console
+    print(f"Compatibility Effects Summary (Epoch {epoch}, Step {step}):")
+    for effect in effects_log[:3]:  # Show first 3 examples
+        print(f"  Base '{effect['base_char']}' → Boosted: {effect['boosted'][:2]}")
+        print(f"  Base '{effect['base_char']}' → Suppressed: {effect['suppressed'][:2]}")

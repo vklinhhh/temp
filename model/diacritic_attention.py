@@ -69,46 +69,7 @@ class VisualDiacriticAttention(nn.Module):
                 nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
                     nn.init.zeros_(module.bias)
-    
-    # def forward(self, features):
-    #     """
-    #     Apply visual diacritic attention to input features.
-        
-    #     Args:
-    #         features: Tensor of shape [batch_size, seq_length, feature_dim]
-    #                 Typically the output of shared feature layers
-        
-    #     Returns:
-    #         diacritic_logits: Tensor of shape [batch_size, seq_length, diacritic_vocab_size]
-    #     """
-    #     batch_size, seq_length, _ = features.shape
-        
-    #     # Generate position attention weights
-    #     # [batch_size, seq_length, 3]
-    #     position_logits = self.position_encoder(features)
-    #     position_weights = F.softmax(position_logits, dim=-1)
-        
-    #     # Apply each specialized classifier to all positions
-    #     region_logits = []
-    #     for i, classifier in enumerate(self.region_classifiers):
-    #         # [batch_size, seq_length, diacritic_vocab_size]
-    #         region_output = classifier(features)
-            
-    #         # Weight by position attention
-    #         # [batch_size, seq_length, 1] * [batch_size, seq_length, diacritic_vocab_size]
-    #         weighted_output = position_weights[:, :, i:i+1] * region_output
-    #         region_logits.append(weighted_output)
-        
-    #     # Option 1: Sum the weighted outputs from different regions
-    #     # diacritic_logits = sum(region_logits)
-        
-    #     # Option 2: Concatenate and fuse with a linear layer (more expressive)
-    #     # [batch_size, seq_length, diacritic_vocab_size*3]
-    #     concatenated_logits = torch.cat(region_logits, dim=-1)
-    #     # [batch_size, seq_length, diacritic_vocab_size]
-    #     diacritic_logits = self.output_fusion(concatenated_logits)
-        
-    #     return diacritic_logits
+
     def forward(self, features, return_attention_weights=False): # Added return_attention_weights
             batch_size, seq_length, _ = features.shape
             
@@ -169,7 +130,8 @@ class CharacterDiacriticCompatibility(nn.Module):
             return
 
         with torch.no_grad():
-            self.compatibility_matrix.fill_(-3.0) 
+            # Start with STRONG negative bias for everything
+            self.compatibility_matrix.fill_(-5.0)  # Even more negative to ensure blocking
 
             def get_idx(vocab_list_original, item_name_target_lower, not_found_val=-1):
                 for i, item in enumerate(vocab_list_original):
@@ -177,14 +139,17 @@ class CharacterDiacriticCompatibility(nn.Module):
                         return i
                 return not_found_val
 
+            # Get special indices
             no_diac_idx = get_idx(self.diacritic_vocab, 'no_diacritic')
             blank_diac_idx = get_idx(self.diacritic_vocab, '<blank>')
             unk_diac_idx = get_idx(self.diacritic_vocab, '<unk>')
             
+            # Pure tone mark indices
             pure_tone_names_lower = ['acute', 'grave', 'hook', 'tilde', 'dot']
             pure_tone_indices = [get_idx(self.diacritic_vocab, n) for n in pure_tone_names_lower]
             pure_tone_indices = [i for i in pure_tone_indices if i != -1]
 
+            # Modifier indices
             MODIFIERS_MAP = {
                 'breve': get_idx(self.diacritic_vocab, 'breve'),
                 'horn': get_idx(self.diacritic_vocab, 'horn'),
@@ -193,110 +158,210 @@ class CharacterDiacriticCompatibility(nn.Module):
             }
             MODIFIERS_MAP = {k: v for k, v in MODIFIERS_MAP.items() if v != -1}
 
-            VI_PLAIN_VOWELS_LOWER = ['a', 'e', 'i', 'o', 'u', 'y']
-            # Now 'đ' is not pre-diacriticized, so it should be in the general consonant list if it behaves like one.
-            # Or, if it has unique behavior, it's handled as a special case outside this list.
-            # For now, let's assume 'd' is special (for stroke), and 'đ' (if present as a base char) is a standard consonant.
-            VI_CONSONANTS_LOWER = ['b', 'c', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'x', 'f', 'j', 'w', 'z'] # Added 'đ' here
-            VI_D_LOWER = 'd' # This is the base 'd' that can take a stroke
-            
-            # PRE_DIACRITICIZED_BASE_LOWER = ['đ'] # REMOVED 'đ' from here
-            PRE_DIACRITICIZED_BASE_LOWER = [] # List of base chars that are *already modified* and should ONLY take 'no_diacritic'
+            # 🎯 CORRECTED: Proper Vietnamese character classification
+            VI_VOWELS_LOWER = ['a', 'e', 'i', 'o', 'u', 'y']  # Pure vowels that can take diacritics
+            VI_CONSONANTS_LOWER = [
+                'b', 'c', 'd', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'x', 
+                'f', 'j', 'w', 'z'  # All consonants - should ONLY take 'no_diacritic'
+            ]
+            VI_SPECIAL_D = 'd'  # Can take stroke to become 'đ'
 
-            logger.info(f"Initializing compatibility matrix with priors: no_diac_idx={no_diac_idx}, blank_diac_idx={blank_diac_idx}")
-            logger.info(f"Pure tone indices found: {pure_tone_indices}")
-            logger.info(f"Modifiers map (name_lower -> index): {MODIFIERS_MAP}")
+            logger.info(f"Initializing compatibility with linguistic rules:")
+            logger.info(f"  - Vowels that can take diacritics: {VI_VOWELS_LOWER}")
+            logger.info(f"  - Consonants (no diacritics): {VI_CONSONANTS_LOWER}")
 
             for base_idx, base_char_orig in enumerate(self.base_char_vocab):
-                if not isinstance(base_char_orig, str): continue 
+                if not isinstance(base_char_orig, str): 
+                    continue 
                 base_char_lower = base_char_orig.lower()
 
+                # Handle special tokens
                 if base_char_lower == '<blank>':
-                    if blank_diac_idx != -1: self.compatibility_matrix[base_idx, blank_diac_idx] = 5.0
+                    if blank_diac_idx != -1: 
+                        self.compatibility_matrix[base_idx, blank_diac_idx] = 5.0
                     continue 
                 
                 if base_char_lower == '<unk>':
-                    if unk_diac_idx != -1: self.compatibility_matrix[base_idx, unk_diac_idx] = 3.0
-                    if no_diac_idx != -1: self.compatibility_matrix[base_idx, no_diac_idx] = 2.0
+                    if unk_diac_idx != -1: 
+                        self.compatibility_matrix[base_idx, unk_diac_idx] = 3.0
+                    if no_diac_idx != -1: 
+                        self.compatibility_matrix[base_idx, no_diac_idx] = 2.0
                     continue
 
-                # Default compatibility with 'no_diacritic' for all "normal" characters
+                # 🔥 RULE 1: ALL characters can have 'no_diacritic'
                 if no_diac_idx != -1:
-                    self.compatibility_matrix[base_idx, no_diac_idx] = 2.5 
+                    self.compatibility_matrix[base_idx, no_diac_idx] = 3.0
 
-                # Handle characters that are truly pre-diacriticized in the base vocab (if any remain)
-                if base_char_lower in PRE_DIACRITICIZED_BASE_LOWER: # This list is now empty, but kept for structure
-                    # These are already modified. They should only be compatible with 'no_diacritic'.
-                    # (Handled by the general rule above, others remain -3.0)
-                    continue
-
-                # Handle base 'd' (which can take 'stroke' to become 'đ')
-                if base_char_lower == VI_D_LOWER: # This is for 'd', not 'đ'
-                    stroke_idx = MODIFIERS_MAP.get('stroke', -1)
-                    if stroke_idx != -1:
-                        self.compatibility_matrix[base_idx, stroke_idx] = 3.5 # d + stroke -> đ
-                    # 'd' itself is a consonant, so it shouldn't take other tones/modifiers directly.
-                    # (Handled by falling through to consonant logic if not d + stroke)
-                    # The primary purpose here is to allow 'd' + 'stroke'. Other diacritics for 'd' will be -3.0.
-                    continue # Important to continue to prevent 'd' from being treated as a regular consonant below for other diacritics
-
-                # Handle other consonants (including 'đ' now, if it's in VI_CONSONANTS_LOWER)
+                # 🔥 RULE 2: CONSONANTS - ONLY 'no_diacritic' (except 'd' + stroke)
                 if base_char_lower in VI_CONSONANTS_LOWER:
-                    # Consonants (including 'đ') are compatible with 'no_diacritic' (set above).
-                    # Generally, Vietnamese consonants (including 'đ') do not take tones or modifiers.
-                    # So, all other diacritics for them remain strongly negative (-3.0).
+                    if base_char_lower == VI_SPECIAL_D:
+                        # Special case: 'd' can take stroke to become 'đ'
+                        stroke_idx = MODIFIERS_MAP.get('stroke', -1)
+                        if stroke_idx != -1:
+                            self.compatibility_matrix[base_idx, stroke_idx] = 3.5
+                            logger.debug(f"Allowing 'd' + stroke → 'đ'")
+                    
+                    # For ALL consonants (including 'd'), only 'no_diacritic' is allowed
+                    # All tone marks and other modifiers remain at -5.0 (strongly forbidden)
+                    logger.debug(f"Consonant '{base_char_lower}' → only 'no_diacritic' allowed")
                     continue
 
-                # --- Logic for Plain Vowels ---
-                if base_char_lower in VI_PLAIN_VOWELS_LOWER:
-                    # 1. Pure Tones for all plain vowels
+                # 🔥 RULE 3: VOWELS - Can take tone marks and specific modifiers
+                if base_char_lower in VI_VOWELS_LOWER:
+                    # All pure tones are allowed for all vowels
                     for tone_idx in pure_tone_indices:
-                        self.compatibility_matrix[base_idx, tone_idx] = 3.0
+                        self.compatibility_matrix[base_idx, tone_idx] = 4.0
 
-                    # 2. Pure Modifiers (specific to vowels)
-                    can_take_modifier_indices = [] 
+                    # Vowel-specific modifiers
+                    vowel_modifiers = []
                     if base_char_lower == 'a':
-                        if MODIFIERS_MAP.get('breve', -1) != -1:
-                            self.compatibility_matrix[base_idx, MODIFIERS_MAP['breve']] = 3.0
-                            can_take_modifier_indices.append(MODIFIERS_MAP['breve'])
-                        if MODIFIERS_MAP.get('circumflex', -1) != -1:
-                            self.compatibility_matrix[base_idx, MODIFIERS_MAP['circumflex']] = 3.0
-                            can_take_modifier_indices.append(MODIFIERS_MAP['circumflex'])
+                        vowel_modifiers = ['breve', 'circumflex']
                     elif base_char_lower == 'e':
-                        if MODIFIERS_MAP.get('circumflex', -1) != -1:
-                            self.compatibility_matrix[base_idx, MODIFIERS_MAP['circumflex']] = 3.0
-                            can_take_modifier_indices.append(MODIFIERS_MAP['circumflex'])
+                        vowel_modifiers = ['circumflex']
                     elif base_char_lower == 'o':
-                        if MODIFIERS_MAP.get('circumflex', -1) != -1:
-                            self.compatibility_matrix[base_idx, MODIFIERS_MAP['circumflex']] = 3.0
-                            can_take_modifier_indices.append(MODIFIERS_MAP['circumflex'])
-                        if MODIFIERS_MAP.get('horn', -1) != -1:
-                            self.compatibility_matrix[base_idx, MODIFIERS_MAP['horn']] = 3.0
-                            can_take_modifier_indices.append(MODIFIERS_MAP['horn'])
+                        vowel_modifiers = ['circumflex', 'horn']
                     elif base_char_lower == 'u':
-                        if MODIFIERS_MAP.get('horn', -1) != -1:
-                            self.compatibility_matrix[base_idx, MODIFIERS_MAP['horn']] = 3.0
-                            can_take_modifier_indices.append(MODIFIERS_MAP['horn'])
-                    
-                    # 3. Combined Diacritics (Modifier_Tone)
+                        vowel_modifiers = ['horn']
+
+                    # Apply vowel-specific modifiers
+                    for modifier_name in vowel_modifiers:
+                        modifier_idx = MODIFIERS_MAP.get(modifier_name, -1)
+                        if modifier_idx != -1:
+                            self.compatibility_matrix[base_idx, modifier_idx] = 4.0
+
+                    # Combined diacritics (modifier + tone)
                     for combined_diac_idx, combined_diac_str_orig in enumerate(self.diacritic_vocab):
-                        if not isinstance(combined_diac_str_orig, str): continue
+                        if not isinstance(combined_diac_str_orig, str): 
+                            continue
                         combined_diac_str_lower = combined_diac_str_orig.lower()
                         
                         parts = combined_diac_str_lower.split('_')
                         if len(parts) == 2: 
-                            mod_part_name_lower, tone_part_name_lower = parts[0], parts[1]
-                            is_valid_tone_part = tone_part_name_lower in pure_tone_names_lower
-                            modifier_part_idx_in_vocab = MODIFIERS_MAP.get(mod_part_name_lower, -1)
+                            mod_part, tone_part = parts[0], parts[1]
+                            
+                            # Check if this combination is valid for this vowel
+                            if (tone_part in pure_tone_names_lower and 
+                                mod_part in vowel_modifiers):
+                                self.compatibility_matrix[base_idx, combined_diac_idx] = 4.0
 
-                            if is_valid_tone_part and \
-                               modifier_part_idx_in_vocab != -1 and \
-                               modifier_part_idx_in_vocab in can_take_modifier_indices:
-                                self.compatibility_matrix[base_idx, combined_diac_idx] = 3.0
-                # else: Covers numbers, symbols etc. They are compatible with 'no_diacritic' (set earlier), 
-                # and all other diacritics remain -3.0.
+                    logger.debug(f"Vowel '{base_char_lower}' → allowed modifiers: {vowel_modifiers}")
+                    continue
 
-            logger.info("Completed initialization of compatibility matrix with detailed Vietnamese linguistic priors (đ treated as a regular consonant).")
+                # 🔥 RULE 4: Numbers, symbols, punctuation - only 'no_diacritic'
+                # Everything else (numbers, symbols, punctuation) only gets 'no_diacritic'
+                # The matrix is already initialized to -5.0, and 'no_diacritic' is set to 3.0 above
+                logger.debug(f"Non-letter '{base_char_lower}' → only 'no_diacritic' allowed")
+
+            logger.info("Compatibility matrix initialization complete with strict Vietnamese rules")
+            
+            # 🔍 Debug: Print some examples
+            for test_char in ['a', 'b', 'g', 'o']:
+                if test_char in [c.lower() for c in self.base_char_vocab]:
+                    char_idx = next(i for i, c in enumerate(self.base_char_vocab) if c.lower() == test_char)
+                    char_row = self.compatibility_matrix[char_idx]
+                    max_idx = torch.argmax(char_row)
+                    min_idx = torch.argmin(char_row)
+                    logger.info(f"'{test_char}' → best: {self.diacritic_vocab[max_idx]} ({char_row[max_idx]:.1f}), "
+                            f"worst: {self.diacritic_vocab[min_idx]} ({char_row[min_idx]:.1f})")
+
+    def _create_ideal_compatibility_matrix(self):
+        """Create the ideal compatibility matrix based on Vietnamese linguistic rules"""
+        
+        ideal_matrix = torch.full(
+            (len(self.base_char_vocab), len(self.diacritic_vocab)), 
+            -5.0  # Strong negative default
+        )
+        
+        # Apply the same initialization logic as _initialize_compatibility
+        # but return as tensor instead of updating self.compatibility_matrix
+        
+        def get_idx(vocab_list, target_name):
+            try:
+                return vocab_list.index(target_name.lower())
+            except (ValueError, AttributeError):
+                return -1
+        
+        no_diac_idx = get_idx(self.diacritic_vocab, 'no_diacritic')
+        pure_tone_names = ['acute', 'grave', 'hook', 'tilde', 'dot']
+        pure_tone_indices = [get_idx(self.diacritic_vocab, tone) for tone in pure_tone_names]
+        pure_tone_indices = [i for i in pure_tone_indices if i != -1]
+        
+        VI_VOWELS = ['a', 'e', 'i', 'o', 'u', 'y']
+        VI_CONSONANTS = ['b', 'c', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'f', 'j', 'z']
+        VI_SPECIAL_D = 'd'
+        MODIFIERS_MAP = {
+                'breve': get_idx(self.diacritic_vocab, 'breve'),
+                'horn': get_idx(self.diacritic_vocab, 'horn'),
+                'circumflex': get_idx(self.diacritic_vocab, 'circumflex'),
+                'stroke': get_idx(self.diacritic_vocab, 'stroke')
+            }
+        MODIFIERS_MAP = {k: v for k, v in MODIFIERS_MAP.items() if v != -1}
+
+        for base_idx, base_char in enumerate(self.base_char_vocab):
+            if not isinstance(base_char, str):
+                continue
+            base_lower = base_char.lower()
+            
+            # Rule 1: All characters can have 'no_diacritic'
+            if no_diac_idx != -1:
+                ideal_matrix[base_idx, no_diac_idx] = 3.0
+            
+            # Rule 2: Consonants - ONLY 'no_diacritic'
+            if base_lower in VI_CONSONANTS:
+                if base_lower == VI_SPECIAL_D:
+                    # Special case: 'd' can take stroke to become 'đ'
+                    stroke_idx = MODIFIERS_MAP.get('stroke', -1)
+                    if stroke_idx != -1:
+                        ideal_matrix[base_idx, stroke_idx] = 3.5
+                        logger.debug(f"Allowing 'd' + stroke → 'đ'")
+                    
+                # For ALL consonants (including 'd'), only 'no_diacritic' is allowed
+                # All tone marks and other modifiers remain at -5.0 (strongly forbidden)
+                logger.debug(f"Consonant '{base_lower}' → only 'no_diacritic' allowed")
+                continue
+
+            # Rule 3: Vowels - can take tone marks
+            if base_lower in VI_VOWELS:
+                for tone_idx in pure_tone_indices:
+                    ideal_matrix[base_idx, tone_idx] = 4.0
+                # Vowel-specific modifiers
+                vowel_modifiers = []
+                if base_lower == 'a':
+                    vowel_modifiers = ['breve', 'circumflex']
+                elif base_lower == 'e':
+                    vowel_modifiers = ['circumflex']
+                elif base_lower == 'o':
+                    vowel_modifiers = ['circumflex', 'horn']
+                elif base_lower == 'u':
+                    vowel_modifiers = ['horn']
+
+                # Apply vowel-specific modifiers
+                for modifier_name in vowel_modifiers:
+                    modifier_idx = MODIFIERS_MAP.get(modifier_name, -1)
+                    if modifier_idx != -1:
+                        ideal_matrix[base_idx, modifier_idx] = 4.0
+
+                # Combined diacritics (modifier + tone)
+                for combined_diac_idx, combined_diac_str_orig in enumerate(self.diacritic_vocab):
+                    if not isinstance(combined_diac_str_orig, str): 
+                        continue
+                    combined_diac_str_lower = combined_diac_str_orig.lower()
+                    
+                    parts = combined_diac_str_lower.split('_')
+                    if len(parts) == 2: 
+                        mod_part, tone_part = parts[0], parts[1]
+                        
+                        # Check if this combination is valid for this vowel
+                        if (tone_part in pure_tone_names and 
+                            mod_part in vowel_modifiers):
+                            ideal_matrix[base_idx, combined_diac_idx] = 4.0
+
+                logger.debug(f"Vowel '{base_lower}' → allowed modifiers: {vowel_modifiers}")
+                continue
+        
+
+        
+        return ideal_matrix
 
     def forward(self, base_logits, shared_features=None):
         """
@@ -332,7 +397,18 @@ class CharacterDiacriticCompatibility(nn.Module):
         
         return compatibility_bias, self.compatibility_matrix
 
-
+    def get_linguistic_regularization_loss(self, strength=1.0):
+        """Add regularization to keep compatibility matrix linguistically correct"""
+        if not hasattr(self, '_ideal_compatibility_matrix'):
+            # Create the ideal matrix based on linguistic rules (one time)
+            self._ideal_compatibility_matrix = self._create_ideal_compatibility_matrix()
+        # L2 loss between current matrix and ideal matrix
+        linguistic_loss = F.mse_loss(
+            self.compatibility_matrix, 
+            self._ideal_compatibility_matrix.to(self.compatibility_matrix.device)
+            )
+            
+        return strength * linguistic_loss
 class FewShotDiacriticAdapter(nn.Module):
     """
     Few-Shot Diacritic Learning adapter for rare diacritic combinations.

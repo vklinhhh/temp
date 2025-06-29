@@ -51,6 +51,30 @@ def save_checkpoint(state, filepath, is_best):
     except Exception as e:
         logger.error(f"Error saving checkpoint to {filepath}: {e}", exc_info=True)
 
+def apply_linguistic_correction(model, correction_strength=0.1):
+    """Periodically nudge compatibility matrix toward linguistic rules"""
+    
+    if not hasattr(model, 'character_diacritic_compatibility') or model.character_diacritic_compatibility is None:
+        return
+    
+    compat_module = model.character_diacritic_compatibility
+    
+    if not hasattr(compat_module, '_ideal_compatibility_matrix'):
+        # Create ideal matrix if not exists
+        compat_module._ideal_compatibility_matrix = compat_module._create_ideal_compatibility_matrix()
+    
+    # Nudge current matrix toward ideal matrix
+    with torch.no_grad():
+        ideal_matrix = compat_module._ideal_compatibility_matrix.to(compat_module.compatibility_matrix.device)
+        
+        # Exponential moving average toward ideal
+        compat_module.compatibility_matrix.data = (
+            (1 - correction_strength) * compat_module.compatibility_matrix.data + 
+            correction_strength * ideal_matrix
+        )
+    
+    logger.info(f"Applied linguistic correction with strength {correction_strength}")
+
 # --- Training function (can keep the same name, logic handles different models) ---
 def train_ctc_model(
     model,                      # Can be CtcOcrModel or HierarchicalCtcOcrModel instance
@@ -226,6 +250,9 @@ def train_ctc_model(
 
     try:
         for epoch in range(start_epoch, epochs):
+            if epoch % 5 == 0 and epoch > 0:  # Every 5 epochs after epoch 0
+                apply_linguistic_correction(model, correction_strength=0.05)
+                logger.info(f"Applied linguistic correction at epoch {epoch}")
             current_epoch_num = epoch + 1
             logger.info(f"Starting Epoch {current_epoch_num}/{epochs}")
 
@@ -334,12 +361,54 @@ def train_ctc_model(
                         current_lr = optimizer.param_groups[0]['lr']
                         progress_bar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{current_lr:.2e}")
                         if wandb_run and optimizer_steps % log_interval == 0:
-                             wandb_run.log({
-                                 "train/batch_ctc_loss": loss.item(),
-                                 "train/learning_rate": current_lr,
-                                 "train/step": optimizer_steps,
-                                 "train/scaler_scale": scaler.get_scale() if use_amp else 1.0
-                             })
+                            wandb_run.log({
+                                "train/batch_ctc_loss": loss.item(),
+                                "train/learning_rate": current_lr,
+                                "train/step": optimizer_steps,
+                                "train/scaler_scale": scaler.get_scale() if use_amp else 1.0
+                            })
+                            # 🔍 NEW: Log compatibility matrix effects
+                            if (model.config.hierarchical_mode == "sequential" and 
+                                hasattr(model, 'character_diacritic_compatibility') and 
+                                model.character_diacritic_compatibility is not None):
+                                
+                                # Log specific character-diacritic examples
+                                log_compatibility_examples_to_wandb(model, wandb_run, optimizer_steps)
+                        
+                        def log_compatibility_examples_to_wandb(model, wandb_run, step):
+                            """Log specific examples of compatibility matrix behavior"""
+                            
+                            # Test specific character combinations
+                            test_chars = ['a', 'b', 'e', 'o', 'd']  # Mix of vowels and consonants
+                            
+                            compatibility_examples = {}
+                            
+                            for char in test_chars:
+                                if char in model.base_char_vocab:
+                                    char_idx = model.base_char_vocab.index(char)
+                                    
+                                    # Get compatibility row for this character
+                                    compat_row = model.character_diacritic_compatibility.compatibility_matrix[char_idx]
+                                    
+                                    # Find top compatible and incompatible diacritics
+                                    top_compat_indices = torch.topk(compat_row, k=5).indices
+                                    top_incompat_indices = torch.topk(compat_row, k=5, largest=False).indices
+                                    
+                                    compatible_diacritics = [model.diacritic_vocab[idx.item()] for idx in top_compat_indices]
+                                    incompatible_diacritics = [model.diacritic_vocab[idx.item()] for idx in top_incompat_indices]
+                                    
+                                    compatibility_examples[f"char_{char}_compatible"] = compatible_diacritics
+                                    compatibility_examples[f"char_{char}_incompatible"] = incompatible_diacritics
+                                    
+                                    # Log numerical values
+                                    wandb_run.log({
+                                        f"compatibility/{char}_max_score": compat_row.max().item(),
+                                        f"compatibility/{char}_min_score": compat_row.min().item(),
+                                        f"compatibility/{char}_mean_score": compat_row.mean().item(),
+                                    }, step=step)
+                            
+                            # Log examples as a table
+                            wandb_run.log({"compatibility_examples": compatibility_examples}, step=step)
                         if eval_steps is not None and optimizer_steps > 0 and optimizer_steps % eval_steps == 0:
                             logger.info(f"Running evaluation at step {optimizer_steps}...")
                             val_metrics = compute_ctc_validation_metrics(model, val_loader, device, validation_decoder)
